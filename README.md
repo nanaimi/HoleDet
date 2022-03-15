@@ -22,3 +22,7 @@
 - [ ] try different segmentation techniques (matt)
 - [ ] read automated mav mapping paper, prototype approach (mau zedong)
 - [ ] write email sorkine (igl lab) (nasib)
+
+## links
+- https://www.mendeley.com/reference-manager/library/all-references
+- google drive: https://drive.google.com/drive/folders/1k5sz7Trw9adWmq1XGu5lBjVXnMFTIcZZ
