@@ -147,6 +147,38 @@ int main() {
             interior_boundaries->push_back(point);
         }
     }
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr candidates (new pcl::PointCloud<pcl::PointXYZ>);
+    const float height_threshold = 1.5;
+    for (auto point : *interior_boundaries) {
+        // get all voxels off boundary point
+        pcl::CropBox<pcl::PointXYZ> boxFilter;
+        pcl::PointCloud<pcl::PointXYZ>::Ptr boxed_cloud (new pcl::PointCloud<pcl::PointXYZ>);
+        const float x_min = point.x - leaf_x / 2.0;
+        const float x_max = point.x + leaf_x / 2.0;
+        const float y_min = point.y - leaf_y / 2.0;
+        const float y_max = point.y + leaf_y / 2.0;
+        boxFilter.setMin(Eigen::Vector4f(x_min, y_min, -1000.0, 1.0));
+        boxFilter.setMax(Eigen::Vector4f(x_max, y_max, 1000.0, 1.0));
+        boxFilter.setInputCloud(cloud);
+        boxFilter.filter(*boxed_cloud);
+
+        // get min max z
+        pcl::PointXYZ pt_min;
+        pcl::PointXYZ pt_max;
+        pcl::getMinMax3D(*boxed_cloud, pt_min, pt_max);
+        const float max_z = pt_max.z;
+        const float min_z = pt_min.z;
+
+        if (max_z - min_z > height_threshold) {
+            candidates->push_back(point);
+        }
+    }
+    std::cout << candidates->width << " candidates out of " << interior_boundaries->width <<" boundary points found" << std::endl;
+    viewer->addPointCloud(candidates,"candidates");
+    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0f, 0.0f, 1.0f, "candidates");
+    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5,"candidates");
+
     /*
     pcl::Kmeans kmeans(interior_boundaries->size(),3);
     kmeans.setClusterSize(100);
@@ -166,9 +198,11 @@ int main() {
     std::cout << interior_boundaries;
     viewer->addPointCloud(interior_boundaries,"bound");
     viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0f, 0.0f, 0.0f, "bound");
-    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5,"bound");
+    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 4,"bound");
 
-
+//    viewer->addPointCloud(cloud,"cloud");
+//    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0f, 0.0f, 1.0f, "cloud");
+//    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1,"cloud");
 
 
     viewer->addPointCloud(floor,"floor");
