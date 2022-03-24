@@ -13,6 +13,7 @@
 #include <pcl/filters/extract_indices.h>
 #include <pcl/visualization/pcl_visualizer.h>
 #include <thread>
+#include <math.h>
 #include <string>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/features/boundary.h>
@@ -21,6 +22,8 @@
 #include <pcl/surface/concave_hull.h>
 #include <pcl/surface/convex_hull.h>
 #include <pcl/filters/crop_box.h>
+#include <pcl/ml/kmeans.h>
+#include <pcl/surface/gp3.h>
 
 int main (int argc, char** argv)
 {
@@ -146,22 +149,7 @@ int main (int argc, char** argv)
         }
     }
 
-//    for (auto it = floor_boundary->begin(); it != floor_boundary->end(); it++) {
-//        pcl::PointXYZ point(it->x, it->y, it->z);
-//        float min_dist = 100;
-//        for (int i = 0; i < cloud_hull->size(); ++i) {
-//            float dist = pcl::euclideanDistance(point, cloud_hull->points[i]);
-//            if (dist<min_dist){
-//                min_dist = dist;
-//            }
-//        }
-////        std::cout << min_dist;
-////        std::cout << "\n";
-//        if(min_dist<5){
-//            floor_boundary->erase(it);
-//        }
-//
-//    }
+
     pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries(new pcl::PointCloud<pcl::PointXYZ>);
     for (auto point: *floor_boundary) {
         float min_dist = 100;
@@ -175,6 +163,21 @@ int main (int argc, char** argv)
          interior_boundaries->push_back(point);
         }
     }
+
+    pcl::Kmeans kmeans(interior_boundaries->size(),3);
+    kmeans.setClusterSize(100);
+    for (size_t i = 0; i < interior_boundaries->points.size(); i++)
+    {
+        std::vector<float> data(3);
+        data[0] = interior_boundaries->points[i].x;
+        data[1] = interior_boundaries->points[i].y;
+        data[2] = interior_boundaries->points[i].z;
+        kmeans.addDataPoint(data);
+    }
+    kmeans.kMeans();
+    auto centroids = kmeans.get_centroids();
+
+
     std::cout << interior_boundaries;
     viewer->addPointCloud(interior_boundaries,"bound");
     viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0f, 0.0f, 0.0f, "bound");
@@ -189,12 +192,70 @@ int main (int argc, char** argv)
 
     viewer->addCoordinateSystem(2.0);
 
-    viewer->addPointCloud(trajectory,"trajectory");
-    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0f, 0.0f, 1.0f, "trajectory");
-    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5,"trajectory");
 
 
+//    viewer->addPointCloud(trajectory,"trajectory");
+//    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0f, 0.0f, 1.0f, "trajectory");
+//    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5,"trajectory");
 
+
+    for (int i = 0; i<centroids.size(); i++)
+    {
+        pcl::PointXYZ center;
+        center.x =centroids[i][0];
+        center.y =centroids[i][1];
+        center.z =centroids[i][2];
+        if (isinf(center.x)) continue;
+        auto name = "center_" + std::to_string(i);
+        viewer->addSphere(center,0.5,1.0,1.0,0.0, name);
+        std::cout << center;
+    }
+
+
+    /////// MESH ////////////
+    // Normal estimation*
+    pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> n;
+    pcl::PointCloud<pcl::Normal>::Ptr mesh_normals (new pcl::PointCloud<pcl::Normal>);
+    pcl::search::KdTree<pcl::PointXYZ>::Ptr mesh_tree (new pcl::search::KdTree<pcl::PointXYZ>);
+    mesh_tree->setInputCloud (floor_projected);
+    n.setInputCloud (floor_projected);
+    n.setSearchMethod (mesh_tree);
+    n.setRadiusSearch (1);
+    n.compute (*mesh_normals);
+    //* normals should not contain the point normals + surface curvatures
+
+    // Concatenate the XYZ and normal fields*
+    pcl::PointCloud<pcl::PointNormal>::Ptr cloud_with_normals (new pcl::PointCloud<pcl::PointNormal>);
+    pcl::concatenateFields (*floor_projected, *mesh_normals, *cloud_with_normals);
+    //* cloud_with_normals = cloud + normals
+
+    // Create search tree*
+    pcl::search::KdTree<pcl::PointNormal>::Ptr tree2 (new pcl::search::KdTree<pcl::PointNormal>);
+    tree2->setInputCloud (cloud_with_normals);
+
+    // Initialize objects
+    pcl::GreedyProjectionTriangulation<pcl::PointNormal> gp3;
+    pcl::PolygonMesh triangles;
+
+    // Set the maximum distance between connected points (maximum edge length)
+    gp3.setSearchRadius (2);
+
+    // Set typical values for the parameters
+    gp3.setMu (2.5);
+    gp3.setMaximumNearestNeighbors (100);
+    gp3.setMaximumSurfaceAngle(M_PI/4); // 45 degrees
+    gp3.setMinimumAngle(M_PI/18); // 10 degrees
+    gp3.setMaximumAngle(2*M_PI/3); // 120 degrees
+    gp3.setNormalConsistency(false);
+
+    // Get result
+    gp3.setInputCloud (cloud_with_normals);
+    gp3.setSearchMethod (tree2);
+    gp3.reconstruct (triangles);
+
+    viewer->addPolygonMesh(triangles);
+
+//    viewer->setBackgroundColor (1, 1, 1);
 
     while (!viewer->wasStopped ())
     {
