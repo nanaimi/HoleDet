@@ -35,7 +35,7 @@ int main (int argc, char** argv)
     pcl::PCDReader reader;
     //reader.read ("../data/table_scene_lms400.pcd", *cloud);
 //    reader.read ("/home/hanlonm/HoleDet/Data/projected.pcd", *cloud);
-    reader.read ("/home/hanlonm/HoleDet/Data/hololens.pcd", *cloud);
+    reader.read ("/home/hanlonm/HoleDet/Data/meetingroom.pcd", *cloud);
     reader.read ("/home/hanlonm/HoleDet/Data/ba_keyframes.pcd", *trajectory);
     pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
 
@@ -51,7 +51,7 @@ int main (int argc, char** argv)
 //    boxFilter.setMin(Eigen::Vector4f(10, 10, -5, 1.0));
 //    boxFilter.setMax(Eigen::Vector4f(30, 30, 5, 1.0));
     boxFilter.setInputCloud(cloud);
-    boxFilter.filter(*cloud);
+//    boxFilter.filter(*cloud);
     boxFilter.setInputCloud(trajectory);
 //    boxFilter.filter(*trajectory);
 
@@ -67,9 +67,9 @@ int main (int argc, char** argv)
     // apply filter
     outrem.filter (*cloud);
 
-    viewer->addPointCloud(cloud,"cloud");
-    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0f, 1.0f, 0.0f, "cloud");
-    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 0.5,"cloud");
+//    viewer->addPointCloud(cloud,"cloud");
+//    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0f, 1.0f, 0.0f, "cloud");
+//    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 0.5,"cloud");
 
     // Voxel filter
     std::cerr << *cloud << std::endl;
@@ -182,7 +182,7 @@ int main (int argc, char** argv)
     auto centroids = kmeans.get_centroids();
 
 
-    std::cout << interior_boundaries;
+//    std::cout << interior_boundaries;
     viewer->addPointCloud(interior_boundaries,"bound");
     viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0f, 0.0f, 0.0f, "bound");
     viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5,"bound");
@@ -260,40 +260,61 @@ int main (int argc, char** argv)
 //    viewer->addPolygonMesh(triangles);
 
 //
-    int start_point = 200;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr hole (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
     kdtree.setInputCloud (interior_boundaries);
-
-
-    pcl::PointXYZ search_point = interior_boundaries->points[start_point];
-    std::vector<int> pointIdxRadiusSearch;
-    std::vector<float> pointRadiusSquaredDistance;
-
+    std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> holes;
     std::vector<int> visited;
-    visited.push_back(start_point);
-    hole->push_back(interior_boundaries->points[start_point]);
+    int point_idx;
+    float search_radius = 0.5;
 
-    std::deque<int> to_visit;
-    do{
-        kdtree.radiusSearch(search_point,0.5,pointIdxRadiusSearch,pointRadiusSquaredDistance);
+    for (int i = 0; i < interior_boundaries->points.size(); ++i) {
+        int start_point = i;
+        if (std::count(visited.begin(), visited.end(), i)){continue;}
 
-        for (auto p:pointIdxRadiusSearch) {
-            if(!std::count(visited.begin(),visited.end(),p) && std::find(to_visit.begin(), to_visit.end(), p) == to_visit.end()){
-                to_visit.push_back(p);
+        pcl::PointXYZ search_point = interior_boundaries->points[start_point];
+        std::vector<int> pointIdxRadiusSearch;
+        std::vector<float> pointRadiusSquaredDistance;
+
+        visited.push_back(start_point);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr hole(new pcl::PointCloud<pcl::PointXYZ>);
+        hole->push_back(interior_boundaries->points[start_point]);
+
+        std::deque<int> to_visit;
+        do {
+            kdtree.radiusSearch(search_point, search_radius, pointIdxRadiusSearch, pointRadiusSquaredDistance);
+
+            for (auto p: pointIdxRadiusSearch) {
+                if (!std::count(visited.begin(), visited.end(), p) &&
+                    std::find(to_visit.begin(), to_visit.end(), p) == to_visit.end()) {
+                    if(p<interior_boundaries->points.size() && p > 0){
+                        to_visit.push_back(p);
+                    }
+                }
             }
-        }
-        int point_idx = to_visit.front();
-        to_visit.pop_front();
-        hole->push_back(interior_boundaries->points[point_idx]);
-        search_point = interior_boundaries->points[point_idx];
-        visited.push_back(point_idx);
+            point_idx = to_visit.front();
+            to_visit.pop_front();
+            if(point_idx<interior_boundaries->points.size() && point_idx > 0){
+                hole->push_back(interior_boundaries->points[point_idx]);
+                search_point = interior_boundaries->points[point_idx];
+                visited.push_back(point_idx);
+            } else{break;}
 
-    }while (!to_visit.empty());
+        } while (!to_visit.empty());
+        holes.push_back(hole);
+    }
+    for (int i = 0; i < holes.size(); ++i) {
+        auto name = "hole_" + std::to_string(i);
+        float r1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+        float r2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+        float r3 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+        viewer->addPointCloud(holes[i],name);
+        viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, r1, 1-r1, r3, name);
+        viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5,name);
+    }
 
-    viewer->addPointCloud(hole,"hole");
-    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0f, 0.0f, 1.0f, "hole");
-    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5,"hole");
+//    viewer->addPointCloud(hole,"hole");
+//    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0f, 0.0f, 1.0f, "hole");
+//    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5,"hole");
 
 
 //    viewer->setBackgroundColor (1, 1, 1);
