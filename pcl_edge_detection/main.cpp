@@ -47,10 +47,13 @@ int main (int argc, char** argv)
     float conf_max_y = 10;
     boxFilter.setMin(Eigen::Vector4f(conf_min_x, conf_min_y, -5, 1.0));
     boxFilter.setMax(Eigen::Vector4f(conf_max_x, conf_max_y, 5, 1.0));
+
+//    boxFilter.setMin(Eigen::Vector4f(10, 10, -5, 1.0));
+//    boxFilter.setMax(Eigen::Vector4f(30, 30, 5, 1.0));
     boxFilter.setInputCloud(cloud);
     boxFilter.filter(*cloud);
     boxFilter.setInputCloud(trajectory);
-    boxFilter.filter(*trajectory);
+//    boxFilter.filter(*trajectory);
 
 
 
@@ -66,7 +69,7 @@ int main (int argc, char** argv)
 
     viewer->addPointCloud(cloud,"cloud");
     viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0f, 1.0f, 0.0f, "cloud");
-    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1,"cloud");
+    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 0.5,"cloud");
 
     // Voxel filter
     std::cerr << *cloud << std::endl;
@@ -164,6 +167,7 @@ int main (int argc, char** argv)
         }
     }
 
+    ////// KMEANS //////////
     pcl::Kmeans kmeans(interior_boundaries->size(),3);
     kmeans.setClusterSize(100);
     for (size_t i = 0; i < interior_boundaries->points.size(); i++)
@@ -199,61 +203,102 @@ int main (int argc, char** argv)
 //    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5,"trajectory");
 
 
-    for (int i = 0; i<centroids.size(); i++)
-    {
-        pcl::PointXYZ center;
-        center.x =centroids[i][0];
-        center.y =centroids[i][1];
-        center.z =centroids[i][2];
-        if (isinf(center.x)) continue;
-        auto name = "center_" + std::to_string(i);
-        viewer->addSphere(center,0.5,1.0,1.0,0.0, name);
-        std::cout << center;
-    }
+//    for (int i = 0; i<centroids.size(); i++)
+//    {
+//        pcl::PointXYZ center;
+//        center.x =centroids[i][0];
+//        center.y =centroids[i][1];
+//        center.z =centroids[i][2];
+//        if (isinf(center.x)) continue;
+//        auto name = "center_" + std::to_string(i);
+//        viewer->addSphere(center,0.1,1.0,1.0,0.0, name);
+//        std::cout << center;
+//    }
 
 
     /////// MESH ////////////
     // Normal estimation*
-    pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> n;
-    pcl::PointCloud<pcl::Normal>::Ptr mesh_normals (new pcl::PointCloud<pcl::Normal>);
-    pcl::search::KdTree<pcl::PointXYZ>::Ptr mesh_tree (new pcl::search::KdTree<pcl::PointXYZ>);
-    mesh_tree->setInputCloud (floor_projected);
-    n.setInputCloud (floor_projected);
-    n.setSearchMethod (mesh_tree);
-    n.setRadiusSearch (1);
-    n.compute (*mesh_normals);
-    //* normals should not contain the point normals + surface curvatures
+//    pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> n;
+//    pcl::PointCloud<pcl::Normal>::Ptr mesh_normals (new pcl::PointCloud<pcl::Normal>);
+//    pcl::search::KdTree<pcl::PointXYZ>::Ptr mesh_tree (new pcl::search::KdTree<pcl::PointXYZ>);
+//    mesh_tree->setInputCloud (floor_projected);
+//    n.setInputCloud (floor_projected);
+//    n.setSearchMethod (mesh_tree);
+//    n.setRadiusSearch (1);
+//    n.compute (*mesh_normals);
+//    //* normals should not contain the point normals + surface curvatures
+//
+//    // Concatenate the XYZ and normal fields*
+//    pcl::PointCloud<pcl::PointNormal>::Ptr cloud_with_normals (new pcl::PointCloud<pcl::PointNormal>);
+//    pcl::concatenateFields (*floor_projected, *mesh_normals, *cloud_with_normals);
+//    //* cloud_with_normals = cloud + normals
+//
+//    // Create search tree*
+//    pcl::search::KdTree<pcl::PointNormal>::Ptr tree2 (new pcl::search::KdTree<pcl::PointNormal>);
+//    tree2->setInputCloud (cloud_with_normals);
+//
+//    // Initialize objects
+//    pcl::GreedyProjectionTriangulation<pcl::PointNormal> gp3;
+//    pcl::PolygonMesh triangles;
+//
+//    // Set the maximum distance between connected points (maximum edge length)
+//    gp3.setSearchRadius (2);
+//
+//    // Set typical values for the parameters
+//    gp3.setMu (2.5);
+//    gp3.setMaximumNearestNeighbors (100);
+//    gp3.setMaximumSurfaceAngle(M_PI/4); // 45 degrees
+//    gp3.setMinimumAngle(M_PI/18); // 10 degrees
+//    gp3.setMaximumAngle(2*M_PI/3); // 120 degrees
+//    gp3.setNormalConsistency(false);
+//
+//    // Get result
+//    gp3.setInputCloud (cloud_with_normals);
+//    gp3.setSearchMethod (tree2);
+//    gp3.reconstruct (triangles);
 
-    // Concatenate the XYZ and normal fields*
-    pcl::PointCloud<pcl::PointNormal>::Ptr cloud_with_normals (new pcl::PointCloud<pcl::PointNormal>);
-    pcl::concatenateFields (*floor_projected, *mesh_normals, *cloud_with_normals);
-    //* cloud_with_normals = cloud + normals
+//    viewer->addPolygonMesh(triangles);
 
-    // Create search tree*
-    pcl::search::KdTree<pcl::PointNormal>::Ptr tree2 (new pcl::search::KdTree<pcl::PointNormal>);
-    tree2->setInputCloud (cloud_with_normals);
+//
+    int start_point = 999;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr hole (new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
+    kdtree.setInputCloud (interior_boundaries);
+    pcl::PointXYZ search_point = interior_boundaries->points[start_point];
+    std::vector<int> pointIdxRadiusSearch;
+    std::vector<float> pointRadiusSquaredDistance;
 
-    // Initialize objects
-    pcl::GreedyProjectionTriangulation<pcl::PointNormal> gp3;
-    pcl::PolygonMesh triangles;
+    std::vector<int> visited;
+    visited.push_back(start_point);
+    hole->push_back(interior_boundaries->points[start_point]);
 
-    // Set the maximum distance between connected points (maximum edge length)
-    gp3.setSearchRadius (2);
+    int runs = 1;
+//    for (int i = 0; i < 2000; ++i) {
+    while (true){
+        kdtree.radiusSearch(search_point,0.5,pointIdxRadiusSearch,pointRadiusSquaredDistance);
+        bool all_visited = true;
 
-    // Set typical values for the parameters
-    gp3.setMu (2.5);
-    gp3.setMaximumNearestNeighbors (100);
-    gp3.setMaximumSurfaceAngle(M_PI/4); // 45 degrees
-    gp3.setMinimumAngle(M_PI/18); // 10 degrees
-    gp3.setMaximumAngle(2*M_PI/3); // 120 degrees
-    gp3.setNormalConsistency(false);
+        for (auto p:pointIdxRadiusSearch) {
+            if(!std::count(visited.begin(),visited.end(),p)){
+                all_visited = false;
+            }
+        }
+        if(all_visited){break;}
+        for (auto point_idx:pointIdxRadiusSearch) {
+            if(!std::count(visited.begin(),visited.end(),point_idx)){
+                hole->push_back(interior_boundaries->points[point_idx]);
+                search_point = interior_boundaries->points[point_idx];
+                visited.push_back(point_idx);
+                break;
+            }
+        }
 
-    // Get result
-    gp3.setInputCloud (cloud_with_normals);
-    gp3.setSearchMethod (tree2);
-    gp3.reconstruct (triangles);
+    }
 
-    viewer->addPolygonMesh(triangles);
+    viewer->addPointCloud(hole,"hole");
+    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0f, 0.0f, 1.0f, "hole");
+    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5,"hole");
+
 
 //    viewer->setBackgroundColor (1, 1, 1);
 
