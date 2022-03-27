@@ -260,10 +260,12 @@ int main (int argc, char** argv)
 //    viewer->addPolygonMesh(triangles);
 
 //
-    int start_point = 999;
+    int start_point = 200;
     pcl::PointCloud<pcl::PointXYZ>::Ptr hole (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
     kdtree.setInputCloud (interior_boundaries);
+
+
     pcl::PointXYZ search_point = interior_boundaries->points[start_point];
     std::vector<int> pointIdxRadiusSearch;
     std::vector<float> pointRadiusSquaredDistance;
@@ -272,28 +274,22 @@ int main (int argc, char** argv)
     visited.push_back(start_point);
     hole->push_back(interior_boundaries->points[start_point]);
 
-    int runs = 1;
-//    for (int i = 0; i < 2000; ++i) {
-    while (true){
+    std::deque<int> to_visit;
+    do{
         kdtree.radiusSearch(search_point,0.5,pointIdxRadiusSearch,pointRadiusSquaredDistance);
-        bool all_visited = true;
 
         for (auto p:pointIdxRadiusSearch) {
-            if(!std::count(visited.begin(),visited.end(),p)){
-                all_visited = false;
+            if(!std::count(visited.begin(),visited.end(),p) && std::find(to_visit.begin(), to_visit.end(), p) == to_visit.end()){
+                to_visit.push_back(p);
             }
         }
-        if(all_visited){break;}
-        for (auto point_idx:pointIdxRadiusSearch) {
-            if(!std::count(visited.begin(),visited.end(),point_idx)){
-                hole->push_back(interior_boundaries->points[point_idx]);
-                search_point = interior_boundaries->points[point_idx];
-                visited.push_back(point_idx);
-                break;
-            }
-        }
+        int point_idx = to_visit.front();
+        to_visit.pop_front();
+        hole->push_back(interior_boundaries->points[point_idx]);
+        search_point = interior_boundaries->points[point_idx];
+        visited.push_back(point_idx);
 
-    }
+    }while (!to_visit.empty());
 
     viewer->addPointCloud(hole,"hole");
     viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0f, 0.0f, 1.0f, "hole");
