@@ -19,27 +19,27 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/passthrough.h>
 #include <pcl/filters/project_inliers.h>
-#include <pcl/features/boundary.h>
-#include <pcl/features/normal_3d.h>
-#include <pcl/surface/concave_hull.h>
-#include <pcl/surface/convex_hull.h>
-
-// Poisson stuff imports
+#include <pcl/filters/extract_indices.h>
+#include <pcl/common/io.h> // for concatenateFields
 #include <pcl/common/common.h>
-#include <pcl/io/ply_io.h>
-#include <pcl/search/kdtree.h>
 #include <pcl/features/normal_3d_omp.h>
-#include <pcl/point_types.h>
 #include <pcl/surface/mls.h>
 #include <pcl/surface/poisson.h>
-
-#include <pcl/point_types.h>
-#include <pcl/conversions.h>
 #include <pcl/common/transforms.h>
 
-#include <CGAL/Point_3.h>
-#include <CGAL/Surface_mesh.h>
-#include <CGAL/Simple_cartesian.h>
+
+//#include <pcl/features/boundary.h>
+//#include <pcl/features/normal_3d.h>
+//#include <pcl/surface/concave_hull.h>
+//#include <pcl/surface/convex_hull.h>
+//#include <pcl/io/ply_io.h>
+//#include <pcl/point_types.h>
+//#include <pcl/search/kdtree.h>
+//#include <pcl/point_types.h>
+//#include <pcl/conversions.h>
+//#include <CGAL/Point_3.h>
+//#include <CGAL/Surface_mesh.h>
+//#include <CGAL/Simple_cartesian.h>
 
 using namespace std;
 using namespace pcl;
@@ -111,8 +111,9 @@ using namespace std::literals::chrono_literals;
 //}
 
 /* CONST VARIABLES */
-const int    POISSONDEPTH = 7;
-const float  NORMALSEARCHRADIUS = 0.2;
+const int    POISSONDEPTH = 6;
+const float  NORMALSEARCHRADIUS = 0.5;
+
 const double PASSXLIMMIN = -13.0;
 const double PASSXLIMMAX = 24.0;
 const double PASSYLIMMIN = -15.0;
@@ -124,7 +125,9 @@ Eigen::Affine3f center_rotation = Eigen::Affine3f::Identity();
 Eigen::Vector4f centroid;
 PointCloud<PointXYZ>::Ptr cloud (new PointCloud<PointXYZ>);
 PointCloud<PointXYZ>::Ptr floor_projected (new PointCloud<PointXYZ>);
+PointCloud<PointXYZ>::Ptr ceiling_projected (new PointCloud<PointXYZ>);
 PointCloud<Normal>::Ptr cloud_normals (new PointCloud<Normal>());
+PointCloud<PointXYZ>::Ptr intermediate(new PointCloud<PointXYZ>);
 PolygonMesh mesh;
 
 void pp_callback(const pcl::visualization::PointPickingEvent& event, void* viewer_void)
@@ -145,47 +148,72 @@ void keyboardEventOccurred (const pcl::visualization::KeyboardEvent &event,
 
     if (event.getKeySym () == "r" && event.keyDown ())
     {
-        cout << "r was pressed => Showing preprocessed PointCloud" << endl;
 
-        event_viewer->removePolygonMesh("mesh");
-        event_viewer->removeAllPointClouds();
-
-        event_viewer->addPointCloud(cloud,"raw");
-        event_viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0f, 1.0f, 1.0f, "raw");
-        event_viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2,"raw");
+        if (event_viewer->contains("raw")) {
+            cout << "r was pressed => removing preprocessed PointCloud" << endl;
+            event_viewer->removePointCloud("raw");
+        } else {
+            cout << "r was pressed => showing preprocessed PointCloud" << endl;
+            event_viewer->addPointCloud(cloud,"raw");
+            event_viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0f, 1.0f, 1.0f, "raw");
+            event_viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 1,"raw");
+        }
 
     } else if (event.getKeySym () == "b" && event.keyDown()) {
-        cout << "b was pressed => Showing Floor" << endl;
 
-        event_viewer->removePolygonMesh("mesh");
-        event_viewer->removeAllPointClouds();
+        if (event_viewer->contains("floor")) {
+            cout << "b was pressed => Removing Floor" << endl;
+            event_viewer->removePointCloud("floor");
+        } else {
+            cout << "b was pressed => Showing Floor" << endl;
+//            event_viewer->addPointCloud(floor_projected,"floor");
+            event_viewer->addPointCloud(ceiling_projected,"ceiling");
+//            event_viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0f, 0.0f, 0.0f, "floor");
+//            event_viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 1,"floor");
+            event_viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.5f, 0.0f, 0.5f, "ceiling");
+            event_viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 1,"ceiling");
 
-        event_viewer->removeAllPointClouds();
-        event_viewer->addPointCloud(floor_projected,"floor");
-        event_viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0f, 0.0f, 0.0f, "floor");
-        event_viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 1,"floor");
+        }
 
     } else if (event.getKeySym () == "m" && event.keyDown()) {
-        cout << "m was pressed => Showing reconstructed mesh" << endl;
 
-        event_viewer->removePolygonMesh("mesh");
-        event_viewer->removeAllPointClouds();
-
-        event_viewer->addPolygonMesh(mesh,"meshes",0);
-        event_viewer->addCoordinateSystem (1.0);
+        if (event_viewer->contains("mesh")) {
+            cout << "m was pressed => Removing mesh" << endl;
+            event_viewer->removePolygonMesh("mesh");
+        } else {
+            cout << "m was pressed => Showing mesh" << endl;
+            event_viewer->addPolygonMesh(mesh,"meshes",0);
+            event_viewer->addCoordinateSystem (1.0);
+        }
 
     } else if (event.getKeySym () == "n" && event.keyDown()) {
-        cout << "n was pressed => Showing normals and point cloud" << endl;
 
+        if (event_viewer->contains("normals")) {
+            cout << "n was pressed => Removing normals" << endl;
+            event_viewer->removePointCloud("normals");
+        } else {
+            cout << "n was pressed => Showing normals" << endl;
+            event_viewer->addPointCloudNormals<PointXYZ, Normal>(intermediate, cloud_normals, 1, 0.08, "normals");
+            event_viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0f, 1.0f, 0.0f, "normals");
+        }
+
+    } else if (event.getKeySym () == "i" && event.keyDown()) {
+
+        if (event_viewer->contains("intermediate")) {
+            cout << "i was pressed => Removing normals" << endl;
+            event_viewer->removePointCloud("normals");
+        } else {
+            cout << "i was pressed => Showing normals" << endl;
+            event_viewer->addPointCloud(intermediate,"intermediate");
+            event_viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0f, 0.0f, 1.0f, "normals");
+        }
+
+    } else if (event.getKeySym () == "c" && event.keyDown()) {
+        cout << "c was pressed => clearing all" << endl;
         event_viewer->removePolygonMesh("mesh");
         event_viewer->removeAllPointClouds();
-
-        event_viewer->addPointCloudNormals<pcl::PointXYZ, pcl::Normal>(cloud, cloud_normals, 1, 0.08, "normals");
-        event_viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0f, 1.0f, 0.0f, "normals");
-
     }
 }
-
 
 void preprocess4HoleDet(PointCloud<PointXYZ>::Ptr cloud) {
 
@@ -231,7 +259,7 @@ void preprocess4HoleDet(PointCloud<PointXYZ>::Ptr cloud) {
     /* End Filtering and Preprocessing */
 }
 
-void constructMesh(PointCloud<PointXYZ>::Ptr cloud) {
+void constructMesh(PointCloud<PointXYZ>::Ptr cloud, PolygonMesh & mesh) {
     /* normal estimation using OMP */
     NormalEstimationOMP<PointXYZ, Normal> normal_estimate;
     normal_estimate.setNumberOfThreads(8);
@@ -261,6 +289,87 @@ void constructMesh(PointCloud<PointXYZ>::Ptr cloud) {
     /* end poisson reconstruction */
 }
 
+void getProjectedFloor(const PointCloud<PointXYZ>::Ptr cloud_in, PointCloud<PointXYZ>::Ptr cloud_out, PointCloud<PointXYZ>::Ptr intermediate) {
+    /* Floor Extraction */
+    PointCloud<pcl::PointXYZ>::Ptr floor (new PointCloud<pcl::PointXYZ>);
+    ModelCoefficients::Ptr coefficients (new ModelCoefficients);
+    PointIndices::Ptr inliers (new PointIndices);
+    // Create the segmentation object
+    SACSegmentation<PointXYZ> seg;
+    // Optional
+    seg.setOptimizeCoefficients (true);
+    // Mandatory
+    seg.setModelType (SACMODEL_PLANE);
+    seg.setMethodType (SAC_RANSAC);
+    seg.setDistanceThreshold (0.1);
+    seg.setMaxIterations(10000);
+
+    // Segment dominant plane
+    seg.setInputCloud (cloud_in);
+    seg.segment (*inliers, *coefficients);
+    copyPointCloud<PointXYZ>(*cloud, *inliers, *floor);
+
+
+    ExtractIndices<PointXYZ> extract;
+    extract.setInputCloud (cloud_in);
+    extract.setIndices (inliers);
+    extract.setNegative (true);
+    extract.filter (*cloud_in);
+
+    // Project the model inliers
+    ProjectInliers<PointXYZ> proj;
+    proj.setModelType (SACMODEL_PLANE);
+    // proj.setIndices (inliers);
+    proj.setInputCloud (floor);
+    proj.setModelCoefficients (coefficients);
+    proj.filter (*cloud_out);
+    /* End Floor Extraction */
+
+    copyPointCloud<PointXYZ>(*cloud, *intermediate);
+    ExtractIndices<pcl::PointXYZ> extract_ceiling;
+
+    extract_ceiling.setInputCloud(intermediate);
+    extract_ceiling.setIndices(inliers);
+    extract_ceiling.setNegative(true);
+    extract_ceiling.filter(*intermediate);
+
+}
+
+//void getProjectedCeiling(PointCloud<PointXYZ>::Ptr cloud_in, PointCloud<PointXYZ>::Ptr cloud_out) {
+//    /* Floor Extraction */
+//    PointCloud<pcl::PointXYZ>::Ptr floor (new PointCloud<pcl::PointXYZ>);
+//    ModelCoefficients::Ptr coefficients (new ModelCoefficients);
+//    PointIndices::Ptr inliers (new PointIndices);
+//    // Create the segmentation object
+//    SACSegmentation<pcl::PointXYZ> seg;
+//    // Optional
+//    seg.setOptimizeCoefficients (true);
+//    // Mandatory
+//    seg.setModelType (SACMODEL_PLANE);
+//    seg.setMethodType (SAC_RANSAC);
+//    seg.setDistanceThreshold (0.1);
+//    seg.setMaxIterations(10000);
+//    // Segment dominant plane
+//    seg.setInputCloud (cloud_in);
+//    seg.segment (*inliers, *coefficients);
+//    copyPointCloud<PointXYZ>(*cloud, *inliers, *floor);
+//
+//    pcl::ExtractIndices<pcl::PointXYZ> extract;
+//    extract.setInputCloud (cloud_in);
+//    extract.setIndices (inliers);
+//    extract.setNegative (true);
+//    extract.filter (*cloud_in);
+//
+//    // Project the model inliers
+//    ProjectInliers<pcl::PointXYZ> proj;
+//    proj.setModelType (SACMODEL_PLANE);
+//    // proj.setIndices (inliers);
+//    proj.setInputCloud (floor);
+//    proj.setModelCoefficients (coefficients);
+//    proj.filter (*cloud_out);
+//    /* End Floor Extraction */
+//}
+
 int main(int argc, char *argv[])
 {
     PCDReader reader;
@@ -268,52 +377,24 @@ int main(int argc, char *argv[])
 
     viewer->addCoordinateSystem (1.0);
     viewer->initCameraParameters();
-    viewer->setCameraPosition(0, 30, 0,    0, 0, 0,   0, 0, 1);
-    viewer->setCameraFieldOfView(0.523599);
-//    viewer->setCameraClipDistances(0.00522511, 50);
-
+    viewer->setCameraPosition(0, 0, 1000, 0, 0, 0, 1, 0, 0);
+//    viewer->setCameraFieldOfView(0.523599);
     /* Read in PointCloud */
     reader.read ("/Users/nasib/code/HoleDet/data/talstrasse/hololens.pcd", *cloud);
 
     /* Filtering and Preprocessing */
     preprocess4HoleDet(cloud);
 
-    /* Floor Extraction */
-    pcl::PointCloud<pcl::PointXYZ>::Ptr floor (new pcl::PointCloud<pcl::PointXYZ>);
 
-    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
-    pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
-    // Create the segmentation object
-    pcl::SACSegmentation<pcl::PointXYZ> seg;
-    // Optional
-    seg.setOptimizeCoefficients (true);
-    // Mandatory
-    seg.setModelType (pcl::SACMODEL_PLANE);
-    seg.setMethodType (pcl::SAC_RANSAC);
-    seg.setDistanceThreshold (0.1);
-    seg.setMaxIterations(10000);
-    // Segment dominant plane
-    seg.setInputCloud (cloud);
-    seg.segment (*inliers, *coefficients);
-    pcl::copyPointCloud<pcl::PointXYZ>(*cloud, *inliers, *floor);
+    /* Floor and ceiling Construction */
+    getProjectedFloor(cloud, floor_projected, intermediate);
+    getProjectedFloor(intermediate, ceiling_projected, intermediate);
 
-    pcl::ExtractIndices<pcl::PointXYZ> extract;
-    extract.setInputCloud (cloud);
-    extract.setIndices (inliers);
-    extract.setNegative (true);
-    extract.filter (*cloud);
-
-    // Project the model inliers
-    pcl::ProjectInliers<pcl::PointXYZ> proj;
-    proj.setModelType (pcl::SACMODEL_PLANE);
-    // proj.setIndices (inliers);
-    proj.setInputCloud (floor);
-    proj.setModelCoefficients (coefficients);
-    proj.filter (*floor_projected);
-    /* End Floor Extraction */
+    *intermediate += *floor_projected;
+    *intermediate += *ceiling_projected;
 
     /* Mesh Construction */
-    constructMesh(cloud);
+    constructMesh(intermediate, mesh);
 
     /* Visualization */
     viewer->registerKeyboardCallback (keyboardEventOccurred, (void*)&viewer);
