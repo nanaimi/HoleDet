@@ -4,10 +4,10 @@
 ## Prototyping Phase ToDos:
 
 ### setup etc
-- [ ] datasets (stfm, ask asl? look online, matt asks, ask eric)
+- [x] datasets (stfm, ask asl? look online, matt asks, ask eric)
 - [ ] find more stfm pcl datasets (laurent)
 - [ ] setup repo structure
-- [ ] install libraries (c++: pcl, python: open3d)
+- [x] install libraries (c++: pcl, python: open3d)
 - [x] google drive (laurent)
 - [x] laurent and mau zedong muessen lesen
 - [x] matt dumps pcl code in repo
@@ -26,10 +26,11 @@
 - [ ] construct and find loops using boundary points (matt)
 
 ###
-- [ ] Goal 1: Approach for hole detection defined (30.03.2022)
-- [ ] Goal 2: Implemented holes (TBD)
-- [ ] Goal 3: position approach defined (TBD)
-- [ ] Goal 4: implemented position approach (TBD)
+- [x] Goal 1: Approach for hole detection defined (30.03.2022)
+- [ ] Goal 2: Define Holes
+- [ ] Goal 3: Implemented holes (TBD)
+- [ ] Goal 4: position approach defined (TBD)
+- [ ] Goal 5: implemented position approach (TBD)
 
 ### nice to haves
 - [ ] test edge detection in 3d point clouds (nasib)
