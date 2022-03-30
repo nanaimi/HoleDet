@@ -18,6 +18,7 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/features/boundary.h>
 #include <pcl/features/normal_3d.h>
+#include <pcl/sample_consensus/sac_model_normal_plane.h>
 #include <pcl/filters/project_inliers.h>
 #include <pcl/surface/concave_hull.h>
 #include <pcl/surface/convex_hull.h>
@@ -26,7 +27,8 @@
 #include <pcl/surface/gp3.h>
 #include <pcl/common/centroid.h>
 #include <numeric>
-
+#include <pcl/segmentation/region_growing.h>
+#include <pcl/visualization/cloud_viewer.h>
 
 
 void pp_callback(const pcl::visualization::PointPickingEvent& event, void* viewer_void)
@@ -46,17 +48,17 @@ void keyboardEventOccurred (const pcl::visualization::KeyboardEvent &event,
 {
     pcl::visualization::PCLVisualizer::Ptr event_viewer = *static_cast<pcl::visualization::PCLVisualizer::Ptr *> (viewer_void);
 
-    if (event.getKeySym () == "r" && event.keyDown ())
+    if (event.getKeySym () == "c" && event.keyDown ())
     {
 
         if (event_viewer->contains("cloud")) {
-            cout << "r was pressed => removing preprocessed PointCloud" << endl;
+            cout << "c was pressed => removing preprocessed PointCloud" << endl;
             event_viewer->removePointCloud("cloud");
         } else {
-            cout << "r was pressed => showing preprocessed PointCloud" << endl;
+            cout << "c was pressed => showing preprocessed PointCloud" << endl;
             event_viewer->addPointCloud(cloud,"cloud");
             event_viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0f, 1.0f, 0.0f, "cloud");
-            event_viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1,"cloud");
+            event_viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2,"cloud");
         }
     }
 }
@@ -129,8 +131,8 @@ int main (int argc, char** argv)
     boxFilter.setMin(Eigen::Vector4f(conf_min_x, conf_min_y, -5, 1.0));
     boxFilter.setMax(Eigen::Vector4f(conf_max_x, conf_max_y, 5, 1.0));
 
-//    boxFilter.setMin(Eigen::Vector4f(10, 10, -5, 1.0));
-//    boxFilter.setMax(Eigen::Vector4f(30, 30, 5, 1.0));
+//    boxFilter.setMin(Eigen::Vector4f(-30, 10, -5, 1.0));
+//    boxFilter.setMax(Eigen::Vector4f(6, -40, 5, 1.0));
     boxFilter.setInputCloud(cloud);
 //    boxFilter.filter(*cloud);
     boxFilter.setInputCloud(trajectory);
@@ -195,6 +197,20 @@ int main (int argc, char** argv)
     proj.setInputCloud (floor);
     proj.setModelCoefficients (coefficients);
     proj.filter (*floor_projected);
+
+
+//    pcl::PointCloud<pcl::PointXYZ>::Ptr wall (new pcl::PointCloud<pcl::PointXYZ>);
+//    pcl::SACSegmentation<pcl::PointXYZ> wall_seg;
+//    wall_seg.setModelType(pcl::SACMODEL_NORMAL_PLANE);
+//    wall_seg.setModelType(pcl::SAC_RANSAC);
+//    wall_seg.setOptimizeCoefficients(true);
+//    wall_seg.setDistanceThreshold(0.1);
+//    wall_seg.setMaxIterations(10000);
+//    wall_seg.setInputCloud(cloud);
+//    wall_seg.segment(*inliers, *coefficients);
+//    pcl::copyPointCloud<pcl::PointXYZ>(*cloud, *inliers, *wall);
+//    viewer->addPointCloud(wall, "wall");
+//    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0f, 0.0f, 1.0f, "wall");
 
     // Create a Concave Hull representation of the projected inliers
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_hull (new pcl::PointCloud<pcl::PointXYZ>);
@@ -297,6 +313,35 @@ int main (int argc, char** argv)
 //    }
 
 
+    /////////////REGION GROWING SEG/////////
+
+//    pcl::search::Search<pcl::PointXYZ>::Ptr reg_tree (new pcl::search::KdTree<pcl::PointXYZ>);
+//    pcl::PointCloud <pcl::Normal>::Ptr reg_normals (new pcl::PointCloud <pcl::Normal>);
+//    pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> normal_estimator;
+//    normal_estimator.setSearchMethod (reg_tree);
+//    normal_estimator.setInputCloud (cloud);
+//    normal_estimator.setKSearch (50);
+//    normal_estimator.compute (*reg_normals);
+//
+//    pcl::RegionGrowing<pcl::PointXYZ, pcl::Normal> reg;
+//    reg.setMinClusterSize (50);
+//    reg.setMaxClusterSize (10000);
+//    reg.setSearchMethod (reg_tree);
+//    reg.setNumberOfNeighbours (50);
+//    reg.setInputCloud (cloud);
+//    //reg.setIndices (indices);
+//    reg.setInputNormals (reg_normals);
+//    reg.setSmoothnessThreshold (20.0 / 180.0 * M_PI);
+//    reg.setCurvatureThreshold (1.0);
+//
+//    std::vector <pcl::PointIndices> clusters;
+//    reg.extract (clusters);
+//    pcl::PointCloud <pcl::PointXYZRGB>::Ptr colored_cloud = reg.getColoredCloud ();
+//    pcl::visualization::CloudViewer cluster_viewer ("Cluster viewer");
+//    cluster_viewer.showCloud(colored_cloud);
+//    while (!cluster_viewer.wasStopped ())
+//    {
+//    }
     /////// MESH ////////////
     // Normal estimation*
 //    pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> n;
@@ -346,7 +391,7 @@ int main (int argc, char** argv)
     std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> holes;
     std::vector<int> visited;
     int point_idx;
-    float search_radius = 0.5;
+    float search_radius = 0.6;
 
     for (int i = 0; i < interior_boundaries->points.size(); ++i) {
         int start_point = i;
@@ -395,7 +440,8 @@ int main (int argc, char** argv)
     double stdev = std::sqrt(sq_sum / hole_sizes.size() - mean * mean);
     double med = findMedian(hole_sizes, hole_sizes.size());
     for (int i = 0; i < holes.size(); ++i) {
-        if (holes[i]->points.size()<mean){continue;}
+//        if (holes[i]->points.size()<mean){continue;}
+        if (holes[i]->points.size()<10){continue;}
         auto name = "hole_" + std::to_string(i);
         float r1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
         float r2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
