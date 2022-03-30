@@ -24,18 +24,99 @@
 #include <pcl/filters/crop_box.h>
 #include <pcl/ml/kmeans.h>
 #include <pcl/surface/gp3.h>
+#include <pcl/common/centroid.h>
+#include <numeric>
+
+
+
+void pp_callback(const pcl::visualization::PointPickingEvent& event, void* viewer_void)
+{
+    std::cout << "Picking event active" << std::endl;
+    if(event.getPointIndex() != -1)
+    {
+        float x, y, z;
+        event.getPoint(x, y, z);
+        std::cout << x << "; " << y << "; " << z << std::endl;
+    }
+}
+pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
+
+void keyboardEventOccurred (const pcl::visualization::KeyboardEvent &event,
+                            void* viewer_void)
+{
+    pcl::visualization::PCLVisualizer::Ptr event_viewer = *static_cast<pcl::visualization::PCLVisualizer::Ptr *> (viewer_void);
+
+    if (event.getKeySym () == "r" && event.keyDown ())
+    {
+
+        if (event_viewer->contains("cloud")) {
+            cout << "r was pressed => removing preprocessed PointCloud" << endl;
+            event_viewer->removePointCloud("cloud");
+        } else {
+            cout << "r was pressed => showing preprocessed PointCloud" << endl;
+            event_viewer->addPointCloud(cloud,"cloud");
+            event_viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0f, 1.0f, 0.0f, "cloud");
+            event_viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1,"cloud");
+        }
+    }
+}
+
+// Function for calculating
+// the median
+double findMedian(std::vector<int> a,
+                  int n)
+{
+
+    // If size of the arr[] is even
+    if (n % 2 == 0) {
+
+        // Applying nth_element
+        // on n/2th index
+        nth_element(a.begin(),
+                    a.begin() + n / 2,
+                    a.end());
+
+        // Applying nth_element
+        // on (n-1)/2 th index
+        nth_element(a.begin(),
+                    a.begin() + (n - 1) / 2,
+                    a.end());
+
+        // Find the average of value at
+        // index N/2 and (N-1)/2
+        return (double)(a[(n - 1) / 2]
+                        + a[n / 2])
+               / 2.0;
+    }
+
+        // If size of the arr[] is odd
+    else {
+
+        // Applying nth_element
+        // on n/2
+        nth_element(a.begin(),
+                    a.begin() + n / 2,
+                    a.end());
+
+        // Value at index (N/2)th
+        // is the median
+        return (double)a[n / 2];
+    }
+}
+
+
 
 int main (int argc, char** argv)
 {
     using namespace std::chrono_literals;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
+
     pcl::PointCloud<pcl::PointXYZ>::Ptr trajectory (new pcl::PointCloud<pcl::PointXYZ>);
 
     // Fill in the cloud data
     pcl::PCDReader reader;
     //reader.read ("../data/table_scene_lms400.pcd", *cloud);
 //    reader.read ("/home/hanlonm/HoleDet/Data/projected.pcd", *cloud);
-    reader.read ("/home/hanlonm/HoleDet/Data/meetingroom.pcd", *cloud);
+    reader.read ("/home/hanlonm/HoleDet/Data/hololens.pcd", *cloud);
     reader.read ("/home/hanlonm/HoleDet/Data/ba_keyframes.pcd", *trajectory);
     pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
 
@@ -67,9 +148,9 @@ int main (int argc, char** argv)
     // apply filter
     outrem.filter (*cloud);
 
-//    viewer->addPointCloud(cloud,"cloud");
-//    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0f, 1.0f, 0.0f, "cloud");
-//    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 0.5,"cloud");
+    viewer->addPointCloud(cloud,"cloud");
+    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0f, 1.0f, 0.0f, "cloud");
+    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1,"cloud");
 
     // Voxel filter
     std::cerr << *cloud << std::endl;
@@ -77,7 +158,7 @@ int main (int argc, char** argv)
     sor.setInputCloud (cloud);
     sor.setMinimumPointsNumberPerVoxel(2);
     sor.setLeafSize (0.1, 0.1, 0.1);
-    sor.filter (* cloud);
+//    sor.filter (* cloud);
 
 
 
@@ -302,7 +383,19 @@ int main (int argc, char** argv)
         } while (!to_visit.empty());
         holes.push_back(hole);
     }
+    std::vector<int> hole_sizes;
+    for (auto hole: holes) {
+        hole_sizes.push_back(hole->points.size());
+
+    }
+    double sum = std::accumulate(hole_sizes.begin(), hole_sizes.end(), 0.0);
+    double mean = sum / hole_sizes.size();
+
+    double sq_sum = std::inner_product(hole_sizes.begin(), hole_sizes.end(), hole_sizes.begin(), 0.0);
+    double stdev = std::sqrt(sq_sum / hole_sizes.size() - mean * mean);
+    double med = findMedian(hole_sizes, hole_sizes.size());
     for (int i = 0; i < holes.size(); ++i) {
+        if (holes[i]->points.size()<mean){continue;}
         auto name = "hole_" + std::to_string(i);
         float r1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
         float r2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
@@ -310,6 +403,17 @@ int main (int argc, char** argv)
         viewer->addPointCloud(holes[i],name);
         viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, r1, 1-r1, r3, name);
         viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5,name);
+
+        Eigen::Matrix<float, 4, 1> hole_center;
+        pcl::compute3DCentroid(*holes[i],hole_center);
+        pcl::PointXYZ center;
+        center.x =hole_center.x();
+        center.y =hole_center.y();
+        center.z =hole_center.z();
+        auto center_name = "hole_center_" + std::to_string(i);
+        viewer->addSphere(center,0.3,1.0,1.0,0.0, center_name);
+
+
     }
 
 //    viewer->addPointCloud(hole,"hole");
@@ -318,6 +422,9 @@ int main (int argc, char** argv)
 
 
 //    viewer->setBackgroundColor (1, 1, 1);
+    viewer->registerPointPickingCallback(pp_callback, (void*)&viewer);
+    viewer->registerKeyboardCallback (keyboardEventOccurred, (void*)&viewer);
+
 
     while (!viewer->wasStopped ())
     {
