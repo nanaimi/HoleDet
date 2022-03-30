@@ -14,6 +14,7 @@
 #include <pcl/filters/radius_outlier_removal.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/filters/project_inliers.h>
+#include <pcl/filters/crop_hull.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/features/boundary.h>
 #include <pcl/sample_consensus/method_types.h>
@@ -23,219 +24,243 @@
 #include <pcl/ml/kmeans.h>
 
 using namespace std::chrono_literals;
+using namespace pcl;
+using namespace std;
 
-void FilterPointCLoud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, float leaf_x, float leaf_y, float leaf_z) {
-    pcl::VoxelGrid<pcl::PointXYZ> filter;
+// constants
+bool VISUALS = true;
+const  float LEAFX = 0.1;
+const float LEAFY = 0.1;
+const float LEAFZ = 0.1;
+const int RADREMRADIUS = 1;
+const int RADREMMINPTS = 5;
+
+// MEMBERS
+PointCloud<PointXYZ>::Ptr cloud_ (new PointCloud<PointXYZ>);
+PointCloud<PointXYZ>::Ptr floor_projected_ (new PointCloud<PointXYZ>);
+PointCloud<PointXYZ>::Ptr floor_ (new PointCloud<PointXYZ>);
+PointCloud<PointXYZ>::Ptr cloud_hull_ (new PointCloud<PointXYZ>);
+
+
+/// prints 3d coordinates of points selected
+/// \param event
+/// \param viewer_void
+void pp_callback(const pcl::visualization::PointPickingEvent& event, void* viewer_void)
+{
+    std::cout << "Picking event active" << std::endl;
+    if(event.getPointIndex() != -1)
+    {
+        float x, y, z;
+        event.getPoint(x, y, z);
+        std::cout << x << "; " << y << "; " << z << std::endl;
+    }
+}
+
+
+/// Adds pointclouds to viewer depending on keystroke
+/// \param event
+/// \param viewer_void
+void keyboardEventOccurred (const pcl::visualization::KeyboardEvent &event,
+                            void* viewer_void)
+{
+    visualization::PCLVisualizer::Ptr viewer = *static_cast<visualization::PCLVisualizer::Ptr *> (viewer_void);
+
+    if (event.getKeySym () == "r" && event.keyDown ())
+    {
+
+        if (viewer->contains("cloud")) {
+            cout << "r was pressed => removing preprocessed PointCloud" << endl;
+            viewer->removePointCloud("cloud");
+        } else {
+            cout << "r was pressed => showing preprocessed PointCloud" << endl;
+            viewer->addPointCloud(cloud_,"cloud");
+            viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR, 0.0f, 0.0f, 1.0f, "cloud");
+            viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 1,"cloud");
+        }
+
+    } else if (event.getKeySym () == "o" && event.keyDown()) {
+
+        if (viewer->contains("floor")) {
+            cout << "o was pressed => Removing Floor" << endl;
+            viewer->removePointCloud("floor");
+        } else {
+            cout << "o was pressed => Showing Floor" << endl;
+            viewer->addPointCloud(floor_,"floor");
+            viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR, 0.0f, 0.2f, 0.8f, "floor");
+            viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2,"floor");
+
+        }
+
+    } else if (event.getKeySym () == "l" && event.keyDown()) {
+
+        if (viewer->contains("floor_projected")) {
+            cout << "l was pressed => Removing projected floor" << endl;
+            viewer->removePointCloud("floor_projected");
+        } else {
+            cout << "l was pressed => Showing projected floor" << endl;
+            viewer->addPointCloud(floor_projected_,"floor_projected");
+            viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
+                                                      0.0f, 0.0f, 1.0f, "floor_projected");
+            viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2,"floor_projected");
+        }
+
+    } else if (event.getKeySym () == "b" && event.keyDown()) {
+
+        if (viewer->contains("hull")) {
+            cout << "b was pressed => Removing boundary" << endl;
+            viewer->removePointCloud("hull");
+        } else {
+            cout << "b was pressed => Showing boundary" << endl;
+            viewer->addPointCloud(cloud_hull_,"hull");
+            viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR, 0.0f, 1.0f, 1.0f, "hull");
+            viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2,"hull");
+        }
+    }
+}
+
+/// Filters the pointcloud with a radius outlier removal and creates a Voxel Grid
+/// \param cloud The pointcloud
+/// \param leaf_x Voxelgrid resolution in x-direction
+/// \param leaf_y Voxelgrid resolution in y-direction
+/// \param leaf_z Voxelgrid resolution in z-direction
+/// \param radius Radius of outlier removal
+/// \param min_points min points parameter of outlier removal
+void FilterPointCLoud(PointCloud<PointXYZ>::Ptr cloud, float leaf_x, float leaf_y,
+                      float leaf_z, int radius, int min_points) {
+    // outlier removal
+    RadiusOutlierRemoval<PointXYZ> outrem;
+
+    // build the filter
+    outrem.setInputCloud(cloud);
+    outrem.setRadiusSearch(radius);
+    outrem.setMinNeighborsInRadius (min_points);
+    outrem.setKeepOrganized(true);
+    // apply filter
+    outrem.filter (*cloud);
+
+    VoxelGrid<PointXYZ> filter;
     filter.setInputCloud(cloud);
     filter.setLeafSize(leaf_x, leaf_y, leaf_z);
     filter.filter(*cloud);
 }
 
-int main() {
-    std::string dataset = "/home/maurice/ETH/HoleDet/prototype/data/hololens.pcd";
-    pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer("Cloud Viewer"));
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
-    bool visuals = true;
-
-    const  float leaf_x = 0.1;
-    const float leaf_y = 0.1;
-    const float leaf_z = 0.1;
-
-    if (pcl::io::loadPCDFile<pcl::PointXYZ> (dataset, *cloud) == -1) {
-          PCL_ERROR ("Couldn't read file\n");
-          return (-1);
-    }
-    std::cout << "Loaded "
-                << cloud->width * cloud->height
-                << " data points"
-                << std::endl;
-    // outlier removal
-    pcl::RadiusOutlierRemoval<pcl::PointXYZ> outrem;
-    // build the filter
-    outrem.setInputCloud(cloud);
-    outrem.setRadiusSearch(1);
-    outrem.setMinNeighborsInRadius (5);
-    outrem.setKeepOrganized(true);
-    // apply filter
-    outrem.filter (*cloud);
-
-    FilterPointCLoud(cloud, leaf_x, leaf_y, leaf_z);
-    std::cout << "Points after first filtering:\t" << cloud->width << std::endl;
-
-
+void ExtractFloor(PointCloud<PointXYZ>::Ptr cloud,
+                  PointCloud<PointXYZ>::Ptr floor,
+                  PointCloud<PointXYZ>::Ptr floor_projected) {
     // extract floor
-    pcl::PointCloud<pcl::PointXYZ>::Ptr floor (new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected (new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
-    pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
+    ModelCoefficients::Ptr coefficients (new ModelCoefficients);
+    PointIndices::Ptr inliers (new PointIndices);
     // Create the segmentation object
-    pcl::SACSegmentation<pcl::PointXYZ> seg;
+    SACSegmentation<PointXYZ> seg;
     // Optional
     seg.setOptimizeCoefficients (true);
     // Mandatory
-    seg.setModelType (pcl::SACMODEL_PLANE);
-    seg.setMethodType (pcl::SAC_RANSAC);
+    seg.setModelType (SACMODEL_PLANE);
+    seg.setMethodType (SAC_RANSAC);
     seg.setDistanceThreshold (0.1);
     seg.setMaxIterations(10000);
     // Segment dominant plane
     seg.setInputCloud (cloud);
     seg.segment (*inliers, *coefficients);
-    pcl::copyPointCloud<pcl::PointXYZ>(*cloud, *inliers, *floor);
+    copyPointCloud<PointXYZ>(*cloud, *inliers, *floor);
 
-    pcl::ExtractIndices<pcl::PointXYZ> extract;
+    ExtractIndices<PointXYZ> extract;
     extract.setInputCloud (cloud);
     extract.setIndices (inliers);
     extract.setNegative (true);
     extract.filter (*cloud);
 
     // Project the model inliers
-    pcl::ProjectInliers<pcl::PointXYZ> proj;
-    proj.setModelType (pcl::SACMODEL_PLANE);
+    ProjectInliers<PointXYZ> proj;
+    proj.setModelType (SACMODEL_PLANE);
     // proj.setIndices (inliers);
     proj.setInputCloud (floor);
     proj.setModelCoefficients (coefficients);
     proj.filter (*floor_projected);
+}
+
+int main() {
+
+    std::string dataset = "/home/maurice/ETH/HoleDet/prototype/data/hololens.pcd";
+
+    // visuals
+    visualization::PCLVisualizer::Ptr viewer (new visualization::PCLVisualizer("Cloud Viewer"));
+    viewer->addCoordinateSystem(2.0);
+    viewer->registerKeyboardCallback (keyboardEventOccurred, (void*)&viewer);
+    viewer->registerPointPickingCallback(pp_callback, (void*)&viewer);
+
+    if (io::loadPCDFile<PointXYZ> (dataset, *cloud_) == -1) {
+          PCL_ERROR ("Couldn't read file\n");
+          return (-1);
+    }
+    std::cout << "Loaded "
+                << cloud_->width * cloud_->height
+                << " data points"
+                << std::endl;
+
+
+    FilterPointCLoud(cloud_, LEAFX, LEAFY, LEAFZ, RADREMRADIUS, RADREMMINPTS);
+    std::cout << "Points after first filtering:\t" << cloud_->width << std::endl;
+
+    ExtractFloor(cloud_, floor_, floor_projected_);
 
     // Create a Concave Hull representation of the projected inliers
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_hull (new pcl::PointCloud<pcl::PointXYZ>);
-    std::vector<pcl::Vertices> polygons;
-    pcl::ConcaveHull<pcl::PointXYZ> chull;
-    chull.setInputCloud (floor_projected);
+    PointCloud<PointXYZ>::Ptr convex_hull (new PointCloud<PointXYZ>);
+    std::vector<Vertices> polygons;
+    ConcaveHull<PointXYZ> chull;
+    chull.setInputCloud (floor_projected_);
     chull.setAlpha (1);
-    chull.reconstruct (*cloud_hull,polygons);
-    viewer->addPointCloud(cloud_hull,"hull");
-    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0f, 1.0f, 1.0f, "hull");
-    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2,"hull");
+    chull.reconstruct (*convex_hull, polygons);
 
-    // boundary
-    // fill in the cloud data here
-    pcl::PointCloud<pcl::Normal>::Ptr normals (new pcl::PointCloud<pcl::Normal>);
-    // estimate normals and fill in \a normals
-    pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
-    ne.setInputCloud (floor_projected);
-    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ> ());
-    ne.setSearchMethod (tree);
-    // Use all neighbors in a sphere of radius 3cm
-    ne.setRadiusSearch (0.3);
-    ne.compute (*normals);
-
-    pcl::PointCloud<pcl::Boundary> boundaries;
-    pcl::BoundaryEstimation<pcl::PointXYZ, pcl::Normal, pcl::Boundary> est;
-    est.setInputCloud (floor_projected);
-    est.setInputNormals (normals);
-    est.setRadiusSearch (0.5);   // 50cm radius
-    est.setSearchMethod (typename pcl::search::KdTree<pcl::PointXYZ>::Ptr (new pcl::search::KdTree<pcl::PointXYZ>));
-    est.compute (boundaries);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr floor_boundary(new pcl::PointCloud<pcl::PointXYZ>);
-    for(size_t i = 0; i <floor_projected->points.size(); ++i) {
-        if(boundaries[i].boundary_point> 0) {
-            floor_boundary->push_back(floor_projected->points[i]);
+    int max_num_of_points = 0;
+    int idx_polygon;
+    // get index of largest polygon
+    for(int i = 0; i < polygons.size(); i++) {
+        Vertices vertices = polygons[i];
+        int num_of_points = vertices.vertices.size();
+        if(num_of_points > max_num_of_points) {
+            max_num_of_points = num_of_points;
+            idx_polygon = i;
         }
     }
 
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries(new pcl::PointCloud<pcl::PointXYZ>);
-    for (auto point: *floor_boundary) {
-        float min_dist = 100;
-        for (int i = 0; i < cloud_hull->size(); ++i) {
-            float dist = pcl::euclideanDistance(point, cloud_hull->points[i]);
-            if (dist<min_dist){
-                min_dist = dist;
-            }
+    for(int idx : polygons[idx_polygon].vertices) {
+        PointXYZ pt = convex_hull->points[idx];
+        cloud_hull_->push_back(pt);
+    }
+//    vector<Vertices> poly;
+//    poly.push_back(polygons[idx_polygon]);
+//    CropHull<PointXYZ> cropHull;
+//    cropHull.setHullCloud(convex_hull);
+//    cropHull.setHullIndices(poly);
+//    cropHull.setInputCloud(cloud_);
+//    cropHull.filter(*cloud_);
+
+
+    // adding exterior boundary to viewer
+    viewer->addPointCloud(cloud_hull_,"hull");
+    viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR, 0.0f, 1.0f, 1.0f, "hull");
+    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2,"hull");
+
+    bool first = true;
+    int cnt =  0;
+    PointXYZ last_point = cloud_hull_->points[0];
+    for (auto point : *cloud_hull_) {
+        if (first) {
+            first = false;
+            continue;
         }
-        if(min_dist>0.5){
-            interior_boundaries->push_back(point);
-        }
+        viewer->addLine(point, last_point, 1.0, 0.0, 0.0, "line" + to_string(cnt));
+        last_point = point;
+        cnt++;
     }
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr candidates (new pcl::PointCloud<pcl::PointXYZ>);
-    const float height_threshold = 1.5;
-    for (auto point : *interior_boundaries) {
-        // get all voxels off boundary point
-        pcl::CropBox<pcl::PointXYZ> boxFilter;
-        pcl::PointCloud<pcl::PointXYZ>::Ptr boxed_cloud (new pcl::PointCloud<pcl::PointXYZ>);
-        const float x_min = point.x - leaf_x / 2.0;
-        const float x_max = point.x + leaf_x / 2.0;
-        const float y_min = point.y - leaf_y / 2.0;
-        const float y_max = point.y + leaf_y / 2.0;
-        boxFilter.setMin(Eigen::Vector4f(x_min, y_min, -1000.0, 1.0));
-        boxFilter.setMax(Eigen::Vector4f(x_max, y_max, 1000.0, 1.0));
-        boxFilter.setInputCloud(cloud);
-        boxFilter.filter(*boxed_cloud);
 
-        // get min max z
-        pcl::PointXYZ pt_min;
-        pcl::PointXYZ pt_max;
-        pcl::getMinMax3D(*boxed_cloud, pt_min, pt_max);
-        const float max_z = pt_max.z;
-        const float min_z = pt_min.z;
-
-        if (max_z - min_z > height_threshold) {
-            candidates->push_back(point);
-        }
-    }
-    std::cout << candidates->width << " candidates out of " << interior_boundaries->width <<" boundary points found" << std::endl;
-    viewer->addPointCloud(candidates,"candidates");
-    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0f, 0.0f, 1.0f, "candidates");
-    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5,"candidates");
-
-    /*
-    pcl::Kmeans kmeans(interior_boundaries->size(),3);
-    kmeans.setClusterSize(100);
-    for (size_t i = 0; i < interior_boundaries->points.size(); i++)
-    {
-        std::vector<float> data(3);
-        data[0] = interior_boundaries->points[i].x;
-        data[1] = interior_boundaries->points[i].y;
-        data[2] = interior_boundaries->points[i].z;
-        kmeans.addDataPoint(data);
-    }
-
-    kmeans.kMeans();
-    auto centroids = kmeans.get_centroids();
-    */
-
-    std::cout << interior_boundaries;
-    viewer->addPointCloud(interior_boundaries,"bound");
-    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0f, 0.0f, 0.0f, "bound");
-    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 4,"bound");
-
-//    viewer->addPointCloud(cloud,"cloud");
-//    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0f, 0.0f, 1.0f, "cloud");
-//    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1,"cloud");
-
-
-    viewer->addPointCloud(floor,"floor");
-    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0f, 0.2f, 0.8f, "floor");
-    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2,"floor");
-
-    viewer->addCoordinateSystem(2.0);
-
-
-
-//    viewer->addPointCloud(trajectory,"trajectory");
-//    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0f, 0.0f, 1.0f, "trajectory");
-//    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5,"trajectory");
-
-
-//    for (int i = 0; i<centroids.size(); i++)
-//    {
-//        pcl::PointXYZ center;
-//        center.x =centroids[i][0];
-//        center.y =centroids[i][1];
-//        center.z =centroids[i][2];
-//        if (isinf(center.x)) continue;
-//        auto name = "center_" + std::to_string(i);
-//        viewer->addSphere(center,0.5,1.0,1.0,0.0, name);
-//        std::cout << center;
-//    }
-
-    //visuals
-    if (visuals) {
-
-
+    //VISUALS
+    if (VISUALS) {
         while (!viewer->wasStopped()) {
-            viewer->spinOnce (100);
+            viewer->spinOnce(100);
             std::this_thread::sleep_for(10ms);
         }
     }
