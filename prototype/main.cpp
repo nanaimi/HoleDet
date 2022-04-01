@@ -8,6 +8,7 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl/common/common.h>
+#include <pcl/common/transforms.h>
 #include <pcl/visualization/cloud_viewer.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/crop_box.h>
@@ -30,6 +31,7 @@ using namespace std::chrono_literals;
 using namespace pcl;
 using namespace std;
 using namespace cv;
+using namespace Eigen;
 
 // constants
 bool VISUALS = true;
@@ -53,8 +55,8 @@ struct MouseParams {
 };
 
 struct TransformPoints {
-    Eigen::Vector3f floorplan[3];
-    Eigen::Vector3f cloud[3];
+    Vector3d floorplan[3];
+    Vector3d cloud[3];
     int cnt = 0;
 };
 
@@ -88,7 +90,7 @@ void pp_callback(const pcl::visualization::PointPickingEvent& event, void* param
     {
         float x, y, z;
         event.getPoint(x, y, z);
-        Eigen::Vector3f point (x, y, z);
+        Vector3d point (static_cast<double>(x), static_cast<double>(y), static_cast<double>(z));
         switch(tp->cnt) {
             case 0:
                 tp->floorplan[0] = point;
@@ -292,18 +294,28 @@ void DrawLinesInCloud(PointCloud<PointXYZ>::Ptr cloud, visualization::PCLVisuali
     viewer->addLine(cloud->points[0], last_point, 1.0, 0.0, 0.0, "line" + to_string(cnt));
 }
 
-void CalculateTransform(vector<Eigen::Vector3f> floorplan, vector<Eigen::Vector3f> cloud) {
-    Eigen::Vector3f cog_floorplan;
-    cog_floorplan = 1 / 3 * (floorplan[0] + floorplan[1] + floorplan[2]);
+Eigen::Affine3d CalculateTransformation(Vector3d floorplan[3], Vector3d cloud[3]) {
+    // Translation
 
-    Eigen::Vector3f cog_cloud;
-    cog_cloud = 1 / 3 * (cloud[0] + cloud[1] + cloud[2]);
+    Vector3d cog_floorplan;
+    cog_floorplan = (floorplan[0] + floorplan[1] + floorplan[2]) / 3;
+    Vector3d cog_cloud;
+    cog_cloud = (cloud[0] + cloud[1] + cloud[2]) / 3;
+    Vector3d translation = cog_cloud - cog_floorplan;
 
     for(int i = 0; i < 3; i++) {
-        
+        floorplan[i] += translation;
     }
 
+    Matrix3d N = cloud[0] * floorplan[0].transpose()
+                        + cloud[1] *floorplan[1].transpose()
+                        + cloud[2] * floorplan[2].transpose();
 
+    JacobiSVD<Matrix3d> svd( N, ComputeFullV | ComputeFullU );
+    Matrix3d R = svd.matrixV() * svd.matrixU();
+    Eigen::Affine3d t = Eigen::Affine3d(R);
+    t.translation() = translation;
+    return t;
 }
 
 int main() {
@@ -393,12 +405,33 @@ int main() {
         while (!viewer->wasStopped()) {
             viewer->spinOnce(100);
             std::this_thread::sleep_for(10ms);
-            if(tp.cnt == 5) {
+            if(tp.cnt == 6) {
                 break;
             }
         }
     }
 
+    Eigen::Affine3d trans = CalculateTransformation(tp.floorplan, tp.cloud);
+    PointCloud<PointXYZ>::Ptr transformed_floorplan (new PointCloud<PointXYZ>);
+    transformPointCloud(*floorplan_, *transformed_floorplan, trans, false);
+
+    viewer->removeAllPointClouds();
+    viewer->removeAllShapes();
+
+    // adding floorplan cloud to viewer
+    viewer->addPointCloud(transformed_floorplan,"floorplan");
+    viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR, 0.5f, 0.0f, 0.5f, "floorplan");
+    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2,"floorplan");
+
+    DrawLinesInCloud(transformed_floorplan, viewer);
+
+    //VISUALS
+    if (VISUALS) {
+        while (!viewer->wasStopped()) {
+            viewer->spinOnce(100);
+            std::this_thread::sleep_for(10ms);
+        }
+    }
 
 
     //endregion
