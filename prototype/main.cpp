@@ -313,8 +313,21 @@ Eigen::Affine3d CalculateTransformation(Vector3d floorplan[3], Vector3d cloud[3]
 
     JacobiSVD<Matrix3d> svd( N, ComputeFullV | ComputeFullU );
     Matrix3d R = svd.matrixV() * svd.matrixU();
-    Eigen::Affine3d t = Eigen::Affine3d(R);
-    t.translation() = translation;
+    //Eigen::Affine3d t = Eigen::Affine3d(R);
+    //t.translation() = translation;
+
+    Matrix3d floor;
+    Matrix3d end;
+
+    floor.col(0) = floorplan[0];
+    floor.col(1) = floorplan[1];
+    floor.col(2) = floorplan[2];
+    end.col(0) = cloud[0];
+    end.col(1) = cloud[1];
+    end.col(2) = cloud[2];
+
+    Eigen::Matrix4d trans = Eigen::umeyama(floor, end, false);
+    Eigen::Affine3d t (trans);
     return t;
 }
 
