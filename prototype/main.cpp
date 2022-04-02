@@ -34,7 +34,9 @@ using namespace cv;
 using namespace Eigen;
 
 // constants
-bool VISUALS = true;
+bool VISUALS1 = false;
+bool VISUALS2 = true;
+bool DEBUG = true;
 const  float LEAFX = 0.1;
 const float LEAFY = 0.1;
 const float LEAFZ = 0.1;
@@ -294,43 +296,6 @@ void DrawLinesInCloud(PointCloud<PointXYZ>::Ptr cloud, visualization::PCLVisuali
     viewer->addLine(cloud->points[0], last_point, 1.0, 0.0, 0.0, "line" + to_string(cnt));
 }
 
-Eigen::Affine3d CalculateTransformation(Vector3d floorplan[3], Vector3d cloud[3]) {
-    // Translation
-
-    Vector3d cog_floorplan;
-    cog_floorplan = (floorplan[0] + floorplan[1] + floorplan[2]) / 3;
-    Vector3d cog_cloud;
-    cog_cloud = (cloud[0] + cloud[1] + cloud[2]) / 3;
-    Vector3d translation = cog_cloud - cog_floorplan;
-
-    for(int i = 0; i < 3; i++) {
-        floorplan[i] += translation;
-    }
-
-    Matrix3d N = cloud[0] * floorplan[0].transpose()
-                        + cloud[1] *floorplan[1].transpose()
-                        + cloud[2] * floorplan[2].transpose();
-
-    JacobiSVD<Matrix3d> svd( N, ComputeFullV | ComputeFullU );
-    Matrix3d R = svd.matrixV() * svd.matrixU();
-    //Eigen::Affine3d t = Eigen::Affine3d(R);
-    //t.translation() = translation;
-
-    Matrix3d floor;
-    Matrix3d end;
-
-    floor.col(0) = floorplan[0];
-    floor.col(1) = floorplan[1];
-    floor.col(2) = floorplan[2];
-    end.col(0) = cloud[0];
-    end.col(1) = cloud[1];
-    end.col(2) = cloud[2];
-
-    Eigen::Matrix4d trans = Eigen::umeyama(floor, end, false);
-    Eigen::Affine3d t (trans);
-    return t;
-}
-
 int main() {
 
     string dataset = "/home/maurice/ETH/HoleDet/prototype/data/hololens.pcd";
@@ -343,7 +308,7 @@ int main() {
     mp.img = floorplan;
     namedWindow("floorplan", 0);
     setMouseCallback("floorplan", onMouse, (void*)&mp);
-    while(true) {
+    while(VISUALS1) {
         imshow("floorplan", floorplan);
         if(waitKey(10) == 27) {
             destroyAllWindows();
@@ -355,7 +320,7 @@ int main() {
 //endregion
 
 //region Cloud
-    /* VISUALS */
+    /* VISUALS1 */
     TransformPoints tp;
     visualization::PCLVisualizer::Ptr viewer (new visualization::PCLVisualizer("Cloud Viewer"));
     viewer->addCoordinateSystem(2.0);
@@ -411,10 +376,30 @@ int main() {
         cloud_hull_->push_back(pt);
     }
 
+    if(DEBUG) {
+        floorplan_->push_back(PointXYZ(0, 0, 0));
+        floorplan_->push_back(PointXYZ(-9.2996, 29.5644, 0));
+        floorplan_->push_back(PointXYZ(-9.3, 42.33, 0));
+        floorplan_->push_back(PointXYZ(31.924, 42.334, 0));
+        floorplan_->push_back(PointXYZ(31.785, 36.296, 0));
+        floorplan_->push_back(PointXYZ(24.429, 36.365, 0));
+        floorplan_->push_back(PointXYZ(24.429, 28.731, 0));
+        floorplan_->push_back(PointXYZ(14.71, 28.592, 0));
+        floorplan_->push_back(PointXYZ(14.921, 33.728, 0));
+        floorplan_->push_back(PointXYZ(1.735, 33.45, 0));
+        floorplan_->push_back(PointXYZ(1.666, 29.703, 0));
+        floorplan_->push_back(PointXYZ(3.817, 23.318, 0));
+        floorplan_->push_back(PointXYZ(8.536, 24.637, 0));
+        floorplan_->push_back(PointXYZ(9.993, 19.293, 0));
+        floorplan_->push_back(PointXYZ(5.3438, 17.905, 0));
+        floorplan_->push_back(PointXYZ(7.703, 10.063, 0));
+        floorplan_->push_back(PointXYZ(7.772, 0.139, 0));
+    }
+
     DrawLinesInCloud(floorplan_, viewer);
 
-    //VISUALS
-    if (VISUALS) {
+    //VISUALS1
+    if (VISUALS1) {
         while (!viewer->wasStopped()) {
             viewer->spinOnce(100);
             std::this_thread::sleep_for(10ms);
@@ -424,9 +409,32 @@ int main() {
         }
     }
 
-    Eigen::Affine3d trans = CalculateTransformation(tp.floorplan, tp.cloud);
+    // Eigen::Affine3d trans = CalculateTransformation(tp.floorplan, tp.cloud);
+    Matrix3d floor;
+    Matrix3d end;
+
+
+    if (DEBUG) {
+        floor.col(0) = Vector3d(-0.2996, 42.334, 0.0);
+        floor.col(1) = Vector3d(24.4288, 28.7316, 0.0);
+        floor.col(2) = Vector3d(0.0, 0.0, 0.0);
+        end.col(0) = Vector3d(-28.9435, -16.7969, -1.6831);
+        end.col(1) = Vector3d(-2.0769, -28.2439, -1.6441);
+        end.col(2) = Vector3d(5.3438, 17.905, 0.0);
+    } else {
+        floor.col(0) = tp.floorplan[0];
+        floor.col(1) = tp.floorplan[1];
+        floor.col(2) = tp.floorplan[2];
+        end.col(0) = tp.cloud[0];
+        end.col(1) = tp.cloud[1];
+        end.col(2) = tp.cloud[2];
+    }
+
+    Eigen::Matrix4d trans = Eigen::umeyama(floor, end, true);
+    Eigen::Affine3d t (trans);
+    cout << trans << endl;
     PointCloud<PointXYZ>::Ptr transformed_floorplan (new PointCloud<PointXYZ>);
-    transformPointCloud(*floorplan_, *transformed_floorplan, trans, false);
+    transformPointCloud(*floorplan_, *transformed_floorplan, t, false);
 
     viewer->removeAllPointClouds();
     viewer->removeAllShapes();
@@ -435,18 +443,15 @@ int main() {
     viewer->addPointCloud(transformed_floorplan,"floorplan");
     viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR, 0.5f, 0.0f, 0.5f, "floorplan");
     viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2,"floorplan");
-
     DrawLinesInCloud(transformed_floorplan, viewer);
 
-    //VISUALS
-    if (VISUALS) {
+    // VISUALS
+    if (VISUALS2) {
         while (!viewer->wasStopped()) {
             viewer->spinOnce(100);
             std::this_thread::sleep_for(10ms);
         }
     }
-
-
     //endregion
     return 0;
 }
