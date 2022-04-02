@@ -34,9 +34,9 @@ using namespace cv;
 using namespace Eigen;
 
 // constants
-bool VISUALS1 = false;
+bool VISUALS1 = true;
 bool VISUALS2 = true;
-bool DEBUG = true;
+bool DEBUG = false;
 const  float LEAFX = 0.1;
 const float LEAFY = 0.1;
 const float LEAFZ = 0.1;
@@ -57,8 +57,7 @@ struct MouseParams {
 };
 
 struct TransformPoints {
-    Vector3d floorplan[3];
-    Vector3d cloud[3];
+    vector<Vector3f> points;
     int cnt = 0;
 };
 
@@ -73,7 +72,7 @@ void onMouse(int event, int x, int y, int flags, void* param) {
     if(event != EVENT_LBUTTONDOWN) {
         return;
     }
-    MouseParams* mp = (MouseParams*)param;
+    auto* mp = (MouseParams*)param;
     Mat & img = mp->img;
     Point point (x, y);
     mp->points.push_back(point);
@@ -92,30 +91,10 @@ void pp_callback(const pcl::visualization::PointPickingEvent& event, void* param
     {
         float x, y, z;
         event.getPoint(x, y, z);
-        Vector3d point (static_cast<double>(x), static_cast<double>(y), static_cast<double>(z));
-        switch(tp->cnt) {
-            case 0:
-                tp->floorplan[0] = point;
-                break;
-            case 1:
-                tp->floorplan[1] = point;
-                break;
-            case 2:
-                tp->floorplan[2] = point;
-                break;
-            case 3:
-                tp->cloud[0] = point;
-                break;
-            case 4:
-                tp->cloud[1] = point;
-                break;
-            case 5:
-                tp->cloud[2] = point;
-                break;
-            default:
-                cout << "All points clicked" << endl;
-        }
+        Vector3f point (x, y, z);
+        tp->points.push_back(point);
         tp->cnt++;
+        cout << tp->cnt << endl;
     }
 }
 
@@ -224,9 +203,9 @@ void FilterPointCLoud(PointCloud<PointXYZ>::Ptr cloud, float leaf_x, float leaf_
 /// \param cloud Input cloud
 /// \param floor The cloud of the floor
 /// \param floor_projected The cloud of all projected points
-void ExtractFloor(PointCloud<PointXYZ>::Ptr cloud,
-                  PointCloud<PointXYZ>::Ptr floor,
-                  PointCloud<PointXYZ>::Ptr floor_projected) {
+void ExtractFloor(const PointCloud<PointXYZ>::Ptr& cloud,
+                  const PointCloud<PointXYZ>::Ptr& floor,
+                  const PointCloud<PointXYZ>::Ptr& floor_projected) {
     // extract floor
     ModelCoefficients::Ptr coefficients (new ModelCoefficients);
     PointIndices::Ptr inliers (new PointIndices);
@@ -263,7 +242,7 @@ void ExtractFloor(PointCloud<PointXYZ>::Ptr cloud,
 /// Creates a Point Cloud from the image points vector
 /// \param cloud
 /// \param img_pts
-void CreatePointCloudFromImgPts(PointCloud<PointXYZ>::Ptr cloud, vector<Point> img_pts) {
+void CreatePointCloudFromImgPts(const PointCloud<PointXYZ>::Ptr& cloud, vector<Point> img_pts) {
     PointXYZ last_pt (0, 0, 0);
     cloud->push_back(last_pt);
     for(int i = 1; i < img_pts.size(); i++) {
@@ -308,7 +287,7 @@ int main() {
     mp.img = floorplan;
     namedWindow("floorplan", 0);
     setMouseCallback("floorplan", onMouse, (void*)&mp);
-    while(VISUALS1) {
+    while(!DEBUG) {
         imshow("floorplan", floorplan);
         if(waitKey(10) == 27) {
             destroyAllWindows();
@@ -320,7 +299,7 @@ int main() {
 //endregion
 
 //region Cloud
-    /* VISUALS1 */
+    /* VISUALS */
     TransformPoints tp;
     visualization::PCLVisualizer::Ptr viewer (new visualization::PCLVisualizer("Cloud Viewer"));
     viewer->addCoordinateSystem(2.0);
@@ -363,7 +342,7 @@ int main() {
     // get index of largest polygon
     for(int i = 0; i < polygons.size(); i++) {
         Vertices vertices = polygons[i];
-        int num_of_points = vertices.vertices.size();
+        int num_of_points = static_cast<int>(vertices.vertices.size());
         if(num_of_points > max_num_of_points) {
             max_num_of_points = num_of_points;
             idx_polygon = i;
@@ -371,13 +350,12 @@ int main() {
     }
 
 
-    for(int idx : polygons[idx_polygon].vertices) {
+    for(uint idx : polygons[idx_polygon].vertices) {
         PointXYZ pt = convex_hull->points[idx];
         cloud_hull_->push_back(pt);
     }
 
-    if(DEBUG) {
-        floorplan_->push_back(PointXYZ(0, 0, 0));
+    if(DEBUG) { // create floorplan pointcloud so no clicking has to be done
         floorplan_->push_back(PointXYZ(-9.2996, 29.5644, 0));
         floorplan_->push_back(PointXYZ(-9.3, 42.33, 0));
         floorplan_->push_back(PointXYZ(31.924, 42.334, 0));
@@ -397,42 +375,30 @@ int main() {
     }
 
     DrawLinesInCloud(floorplan_, viewer);
-
     //VISUALS1
     if (VISUALS1) {
         while (!viewer->wasStopped()) {
             viewer->spinOnce(100);
             std::this_thread::sleep_for(10ms);
-            if(tp.cnt == 6) {
+            if(tp.cnt > floorplan_->width) {
                 break;
             }
         }
     }
 
-    // Eigen::Affine3d trans = CalculateTransformation(tp.floorplan, tp.cloud);
     Matrix3d floor;
     Matrix3d end;
+    const uint n = floorplan_->width;
+    MatrixXf floor2(3, n);
+    MatrixXf end2(3, n);
+
+    for(int i = 0; i < n; i++) {
+        floor2.col(i) =  floorplan_->points[i].getVector3fMap();
+        end2.col(i) = tp.points[i];
 
 
-    if (DEBUG) {
-        floor.col(0) = Vector3d(-0.2996, 42.334, 0.0);
-        floor.col(1) = Vector3d(24.4288, 28.7316, 0.0);
-        floor.col(2) = Vector3d(0.0, 0.0, 0.0);
-        end.col(0) = Vector3d(-28.9435, -16.7969, -1.6831);
-        end.col(1) = Vector3d(-2.0769, -28.2439, -1.6441);
-        end.col(2) = Vector3d(5.3438, 17.905, 0.0);
-    } else {
-        floor.col(0) = tp.floorplan[0];
-        floor.col(1) = tp.floorplan[1];
-        floor.col(2) = tp.floorplan[2];
-        end.col(0) = tp.cloud[0];
-        end.col(1) = tp.cloud[1];
-        end.col(2) = tp.cloud[2];
-    }
-
-    Eigen::Matrix4d trans = Eigen::umeyama(floor, end, true);
-    Eigen::Affine3d t (trans);
-    cout << trans << endl;
+    Eigen::Matrix4f trans = Eigen::umeyama(floor2, end2, true);
+    Eigen::Affine3f t (trans);
     PointCloud<PointXYZ>::Ptr transformed_floorplan (new PointCloud<PointXYZ>);
     transformPointCloud(*floorplan_, *transformed_floorplan, t, false);
 
