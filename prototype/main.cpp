@@ -34,9 +34,8 @@ using namespace cv;
 using namespace Eigen;
 
 // constants
-bool VISUALS1 = true;
-bool VISUALS2 = true;
-bool DEBUG = false;
+bool VISUALS = true;
+bool DEBUG = true;
 const  float LEAFX = 0.1;
 const float LEAFY = 0.1;
 const float LEAFZ = 0.1;
@@ -50,6 +49,7 @@ PointCloud<PointXYZ>::Ptr floor_projected_ (new PointCloud<PointXYZ>);
 PointCloud<PointXYZ>::Ptr floor_ (new PointCloud<PointXYZ>);
 PointCloud<PointXYZ>::Ptr cloud_hull_ (new PointCloud<PointXYZ>);
 PointCloud<PointXYZ>::Ptr floorplan_ (new PointCloud<PointXYZ>);
+PointCloud<PointXYZ>::Ptr floor_zero_ (new PointCloud<PointXYZ>);
 
 struct MouseParams {
     Mat img;
@@ -259,7 +259,7 @@ void CreatePointCloudFromImgPts(const PointCloud<PointXYZ>::Ptr& cloud, vector<P
 /// Draws a line between all points in the cloud
 /// \param cloud
 /// \param viewer
-void DrawLinesInCloud(PointCloud<PointXYZ>::Ptr cloud, visualization::PCLVisualizer::Ptr viewer) {
+void DrawLinesInCloud(const PointCloud<PointXYZ>::Ptr cloud, const visualization::PCLVisualizer::Ptr viewer) {
     bool first = true;
     int cnt =  0;
     PointXYZ last_point = cloud->points[0];
@@ -275,10 +275,27 @@ void DrawLinesInCloud(PointCloud<PointXYZ>::Ptr cloud, visualization::PCLVisuali
     viewer->addLine(cloud->points[0], last_point, 1.0, 0.0, 0.0, "line" + to_string(cnt));
 }
 
-int main() {
+void ProjectToZero(const PointCloud<PointXYZ>::Ptr cloud_in, const PointCloud<PointXYZ>::Ptr cloud_out) {
+    // Create a set of planar coefficients with X=Y=0,Z=1
+    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
+    coefficients->values.resize (4);
+    coefficients->values[0] = coefficients->values[1] = 0;
+    coefficients->values[2] = 1.0;
+    coefficients->values[3] = 0;
 
-    string dataset = "/home/maurice/ETH/HoleDet/prototype/data/hololens.pcd";
-    string floorplan_path = "/home/maurice/ETH/HoleDet/prototype/data/floorplan.jpg";
+    // Create the filtering object
+    pcl::ProjectInliers<pcl::PointXYZ> proj;
+    proj.setModelType (pcl::SACMODEL_PLANE);
+    proj.setInputCloud (cloud_in);
+    proj.setModelCoefficients (coefficients);
+    proj.filter (*cloud_out);
+}
+
+int main() {
+    string base_path = "/home/maurice/ETH/HoleDet/prototype/data/";
+    string dataset = base_path + "hololens.pcd";
+    string floorplan_path = base_path + "floorplan.jpg";
+    string floorplan_cloud = base_path + "floorplan.pcd";
 
 
 //region Floorplan
@@ -286,10 +303,10 @@ int main() {
     MouseParams mp;
     mp.img = floorplan;
     namedWindow("floorplan", 0);
-    setMouseCallback("floorplan", onMouse, (void*)&mp);
-    while(!DEBUG) {
+    setMouseCallback("floorplan", onMouse, (void *) &mp);
+    while (!DEBUG) {
         imshow("floorplan", floorplan);
-        if(waitKey(10) == 27) {
+        if (waitKey(10) == 27) {
             destroyAllWindows();
             break;
         }
@@ -301,14 +318,14 @@ int main() {
 //region Cloud
     /* VISUALS */
     TransformPoints tp;
-    visualization::PCLVisualizer::Ptr viewer (new visualization::PCLVisualizer("Cloud Viewer"));
+    visualization::PCLVisualizer::Ptr viewer(new visualization::PCLVisualizer("Cloud Viewer"));
     viewer->addCoordinateSystem(2.0);
-    viewer->registerKeyboardCallback (keyboardEventOccurred, (void*)&viewer);
-    viewer->registerPointPickingCallback(pp_callback, (void*)&tp);
+    viewer->registerKeyboardCallback(keyboardEventOccurred, (void *) &viewer);
+    viewer->registerPointPickingCallback(pp_callback, (void *) &tp);
 
 
     /* READ FILE */
-    if (io::loadPCDFile<PointXYZ> (dataset, *cloud_) == -1) {
+    if (io::loadPCDFile<PointXYZ>(dataset, *cloud_) == -1) {
         PCL_ERROR ("Couldn't read file\n");
         return (-1);
     }
@@ -319,9 +336,9 @@ int main() {
 
 
     // adding floorplan cloud to viewer
-    viewer->addPointCloud(floorplan_,"floorplan");
-    viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR, 0.5f, 0.0f, 0.5f, "floorplan");
-    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2,"floorplan");
+    viewer->addPointCloud(floorplan_, "floorplan");
+    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_COLOR, 0.5f, 0.0f, 0.5f, "floorplan");
+    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "floorplan");
 
     /* PREPROCESSING */
     FilterPointCLoud(cloud_, LEAFX, LEAFY, LEAFZ, RADREMRADIUS, RADREMMINPTS);
@@ -330,89 +347,87 @@ int main() {
     ExtractFloor(cloud_, floor_, floor_projected_);
 
     // Create a Concave Hull representation of the projected inliers
-    PointCloud<PointXYZ>::Ptr convex_hull (new PointCloud<PointXYZ>);
+    PointCloud<PointXYZ>::Ptr convex_hull(new PointCloud<PointXYZ>);
     std::vector<Vertices> polygons;
     ConcaveHull<PointXYZ> chull;
-    chull.setInputCloud (floor_projected_);
-    chull.setAlpha (1);
-    chull.reconstruct (*convex_hull, polygons);
+    chull.setInputCloud(floor_projected_);
+    chull.setAlpha(1);
+    chull.reconstruct(*convex_hull, polygons);
 
     int max_num_of_points = 0;
     int idx_polygon;
     // get index of largest polygon
-    for(int i = 0; i < polygons.size(); i++) {
+    for (int i = 0; i < polygons.size(); i++) {
         Vertices vertices = polygons[i];
         int num_of_points = static_cast<int>(vertices.vertices.size());
-        if(num_of_points > max_num_of_points) {
+        if (num_of_points > max_num_of_points) {
             max_num_of_points = num_of_points;
             idx_polygon = i;
         }
     }
 
 
-    for(uint idx : polygons[idx_polygon].vertices) {
+    for (uint idx: polygons[idx_polygon].vertices) {
         PointXYZ pt = convex_hull->points[idx];
         cloud_hull_->push_back(pt);
     }
-
-    if(DEBUG) { // create floorplan pointcloud so no clicking has to be done
-        floorplan_->push_back(PointXYZ(-9.2996, 29.5644, 0));
-        floorplan_->push_back(PointXYZ(-9.3, 42.33, 0));
-        floorplan_->push_back(PointXYZ(31.924, 42.334, 0));
-        floorplan_->push_back(PointXYZ(31.785, 36.296, 0));
-        floorplan_->push_back(PointXYZ(24.429, 36.365, 0));
-        floorplan_->push_back(PointXYZ(24.429, 28.731, 0));
-        floorplan_->push_back(PointXYZ(14.71, 28.592, 0));
-        floorplan_->push_back(PointXYZ(14.921, 33.728, 0));
-        floorplan_->push_back(PointXYZ(1.735, 33.45, 0));
-        floorplan_->push_back(PointXYZ(1.666, 29.703, 0));
-        floorplan_->push_back(PointXYZ(3.817, 23.318, 0));
-        floorplan_->push_back(PointXYZ(8.536, 24.637, 0));
-        floorplan_->push_back(PointXYZ(9.993, 19.293, 0));
-        floorplan_->push_back(PointXYZ(5.3438, 17.905, 0));
-        floorplan_->push_back(PointXYZ(7.703, 10.063, 0));
-        floorplan_->push_back(PointXYZ(7.772, 0.139, 0));
+    if(DEBUG) {
+        /* LOAD FLOORPLAN PC FROM FILE */
+        if (io::loadPCDFile<PointXYZ>(floorplan_cloud, *floorplan_) == -1) {
+            PCL_ERROR ("Couldn't read file\n");
+            return (-1);
+        }
+        std::cout << "Loaded floorplan cloud successfully" << std::endl;
     }
 
     DrawLinesInCloud(floorplan_, viewer);
-    //VISUALS1
-    if (VISUALS1) {
+    ProjectToZero(floor_projected_, floor_zero_);
+    // adding floor on zero z cloud to viewer
+    viewer->addPointCloud(floor_zero_, "floorzero");
+    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_COLOR, 0.0f, 0.2f, 0.8f, "floorzero");
+    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "floorzero");
+
+    //VISUALS
+    if (VISUALS) {
         while (!viewer->wasStopped()) {
             viewer->spinOnce(100);
             std::this_thread::sleep_for(10ms);
-            if(tp.cnt > floorplan_->width) {
+            if (tp.cnt > floorplan_->width) {
                 break;
             }
         }
     }
 
-    Matrix3d floor;
-    Matrix3d end;
     const uint n = floorplan_->width;
-    MatrixXf floor2(3, n);
-    MatrixXf end2(3, n);
+    MatrixXf floor(3, n);
+    MatrixXf end(3, n);
 
-    for(int i = 0; i < n; i++) {
-        floor2.col(i) =  floorplan_->points[i].getVector3fMap();
-        end2.col(i) = tp.points[i];
+    for (int i = 0; i < n; i++) {
+        floor.col(i) = floorplan_->points[i].getVector3fMap();
+        end.col(i) = tp.points[i];
+    }
 
-
-    Eigen::Matrix4f trans = Eigen::umeyama(floor2, end2, true);
-    Eigen::Affine3f t (trans);
-    PointCloud<PointXYZ>::Ptr transformed_floorplan (new PointCloud<PointXYZ>);
+    Eigen::Matrix4f trans = Eigen::umeyama(floor, end, true);
+    Eigen::Affine3f t(trans);
+    PointCloud<PointXYZ>::Ptr transformed_floorplan(new PointCloud<PointXYZ>);
     transformPointCloud(*floorplan_, *transformed_floorplan, t, false);
 
     viewer->removeAllPointClouds();
     viewer->removeAllShapes();
 
     // adding floorplan cloud to viewer
-    viewer->addPointCloud(transformed_floorplan,"floorplan");
-    viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR, 0.5f, 0.0f, 0.5f, "floorplan");
-    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2,"floorplan");
+    viewer->addPointCloud(transformed_floorplan, "floorplan");
+    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_COLOR, 0.5f, 0.0f, 0.5f, "floorplan");
+    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "floorplan");
     DrawLinesInCloud(transformed_floorplan, viewer);
 
+    // adding floor on zero z cloud to viewer
+    viewer->addPointCloud(floor_zero_, "floorzero");
+    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_COLOR, 0.0f, 0.2f, 0.8f, "floorzero");
+    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "floorzero");
+
     // VISUALS
-    if (VISUALS2) {
+    if (VISUALS) {
         while (!viewer->wasStopped()) {
             viewer->spinOnce(100);
             std::this_thread::sleep_for(10ms);
