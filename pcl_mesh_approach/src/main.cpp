@@ -27,6 +27,9 @@
 #include <pcl/surface/poisson.h>
 #include <pcl/common/transforms.h>
 
+// utilities
+#include <yaml-cpp/yaml.h>
+//#include <yaml-cpp/node.h>
 
 //#include <pcl/features/boundary.h>
 //#include <pcl/features/normal_3d.h>
@@ -111,13 +114,24 @@ using namespace std::literals::chrono_literals;
 //}
 
 /* CONST VARIABLES */
-const int    POISSONDEPTH = 6;
-const float  NORMALSEARCHRADIUS = 0.5;
+bool debug_;
 
-const double PASSXLIMMIN = -13.0;
-const double PASSXLIMMAX = 24.0;
-const double PASSYLIMMIN = -15.0;
-const double PASSYLIMMAX = 25.0;
+std::string cloud_file_;
+std::string trajectory_file_;
+std::string floorplan_file_;
+
+int PoissonDepth_;
+float NormalSearchRadius_;
+
+double OutlierRadius_;
+int MinNeighbours_;
+
+double ImageResolution_;
+
+double PassXLimMin_;
+double PassXLimMax_;
+double PassYLimMin_;
+double PassYLimMax_;
 
 /* MEMBER VARIABLES */
 Eigen::Affine3f center_translation = Eigen::Affine3f::Identity();
@@ -130,14 +144,41 @@ PointCloud<Normal>::Ptr cloud_normals (new PointCloud<Normal>());
 PointCloud<PointXYZ>::Ptr intermediate(new PointCloud<PointXYZ>);
 PolygonMesh mesh;
 
-void pp_callback(const pcl::visualization::PointPickingEvent& event, void* viewer_void)
-{
+void pp_callback(const pcl::visualization::PointPickingEvent& event,
+                 void* viewer_void) {
     std::cout << "Picking event active" << std::endl;
     if(event.getPointIndex() != -1)
     {
         float x, y, z;
         event.getPoint(x, y, z);
         std::cout << x << "; " << y << "; " << z << std::endl;
+    }
+}
+
+void ReadYaml() {
+    try {
+        YAML::Node config = YAML::LoadFile("../cfg/config.yaml");
+        debug_ = config["debug"].as<bool>();
+
+        cloud_file_ = config["input"]["cloud_file"].as<std::string>();
+        trajectory_file_ = config["input"]["trajectory_file"].as<std::string>();
+        floorplan_file_ = config["input"]["floorplan_file"].as<std::string>();
+
+        PoissonDepth_ = config["parameters"]["poisson_depth"].as<int>();
+        NormalSearchRadius_ = config["parameters"]["normal_search_radius"].as<double>();
+
+        OutlierRadius_ = config["parameters"]["outlier_radius"].as<double>();
+        MinNeighbours_ = config["parameters"]["outlier_min_neighbours"].as<int>();
+
+        ImageResolution_ = config["parameters"]["image_resolution"].as<double>();
+
+        PassXLimMin_ = config["parameters"]["pass_xlim_min"].as<double>();
+        PassXLimMax_ = config["parameters"]["pass_xlim_max"].as<double>();
+        PassYLimMin_ = config["parameters"]["pass_ylim_min"].as<double>();
+        PassYLimMax_ = config["parameters"]["pass_ylim_max"].as<double>();
+
+    } catch(const YAML::ParserException& ex) {
+        std::cout << ex.what() << std::endl;
     }
 }
 
@@ -148,7 +189,7 @@ void keyboardEventOccurred (const pcl::visualization::KeyboardEvent &event,
 
     if (event.getKeySym () == "r" && event.keyDown ())
     {
-
+        ReadYaml();
         if (event_viewer->contains("raw")) {
             cout << "r was pressed => removing preprocessed PointCloud" << endl;
             event_viewer->removePointCloud("raw");
@@ -247,12 +288,12 @@ void preprocess4HoleDet(PointCloud<PointXYZ>::Ptr cloud) {
     PassThrough<PointXYZ> pass_x;
     pass_x.setInputCloud (cloud);
     pass_x.setFilterFieldName ("x");
-    pass_x.setFilterLimits (PASSXLIMMIN, PASSXLIMMAX);
+    pass_x.setFilterLimits (PassXLimMin_, PassXLimMax_);
     pass_x.filter (* cloud);
     PassThrough<PointXYZ> pass_y;
     pass_y.setInputCloud (cloud);
     pass_y.setFilterFieldName ("y");
-    pass_y.setFilterLimits (PASSYLIMMIN, PASSYLIMMAX);
+    pass_y.setFilterLimits (PassYLimMin_, PassYLimMax_);
     //pass.setFilterLimitsNegative (true);
     pass_y.filter (* cloud);
 
@@ -264,7 +305,7 @@ void constructMesh(PointCloud<PointXYZ>::Ptr cloud, PolygonMesh & mesh) {
     NormalEstimationOMP<PointXYZ, Normal> normal_estimate;
     normal_estimate.setNumberOfThreads(8);
     normal_estimate.setInputCloud(cloud);
-    normal_estimate.setRadiusSearch(NORMALSEARCHRADIUS);
+    normal_estimate.setRadiusSearch(NormalSearchRadius_);
     normal_estimate.setViewPoint(centroid[0], centroid[1], centroid[2]);
     normal_estimate.compute(*cloud_normals);
 
@@ -283,7 +324,7 @@ void constructMesh(PointCloud<PointXYZ>::Ptr cloud, PolygonMesh & mesh) {
 
     /* poisson reconstruction */
     Poisson<PointNormal> poisson;
-    poisson.setDepth(POISSONDEPTH);
+    poisson.setDepth(PoissonDepth_);
     poisson.setInputCloud(cloud_smoothed_normals);
     poisson.reconstruct(mesh);
     /* end poisson reconstruction */
@@ -335,6 +376,43 @@ void getProjectedFloor(const PointCloud<PointXYZ>::Ptr cloud_in, PointCloud<Poin
 
 }
 
+int main(int argc, char *argv[])
+{
+    PCDReader reader;
+    visualization::PCLVisualizer::Ptr viewer (new visualization::PCLVisualizer ("3D Viewer"));
+
+    viewer->addCoordinateSystem (1.0);
+    viewer->initCameraParameters();
+    viewer->setCameraPosition(0, 0, 1000, 0, 0, 0, 1, 0, 0);
+//    viewer->setCameraFieldOfView(0.523599);
+    /* Read in PointCloud */
+    reader.read ("/Users/nasib/code/HoleDet/data/talstrasse/hololens.pcd", *cloud);
+
+    /* Filtering and Preprocessing */
+    preprocess4HoleDet(cloud);
+
+    /* Floor and ceiling Construction */
+    getProjectedFloor(cloud, floor_projected, intermediate);
+    getProjectedFloor(intermediate, ceiling_projected, intermediate);
+
+    *intermediate += *floor_projected;
+    *intermediate += *ceiling_projected;
+
+    /* Mesh Construction */
+    constructMesh(intermediate, mesh);
+
+    /* Visualization */
+    viewer->registerKeyboardCallback (keyboardEventOccurred, (void*)&viewer);
+    viewer->registerPointPickingCallback(pp_callback, (void*)&viewer);
+
+    while (!viewer->wasStopped ())
+    {
+        viewer->spinOnce (100);
+        std::this_thread::sleep_for(10ms);
+    }
+    return 0;
+}
+
 //void getProjectedCeiling(PointCloud<PointXYZ>::Ptr cloud_in, PointCloud<PointXYZ>::Ptr cloud_out) {
 //    /* Floor Extraction */
 //    PointCloud<pcl::PointXYZ>::Ptr floor (new PointCloud<pcl::PointXYZ>);
@@ -369,42 +447,3 @@ void getProjectedFloor(const PointCloud<PointXYZ>::Ptr cloud_in, PointCloud<Poin
 //    proj.filter (*cloud_out);
 //    /* End Floor Extraction */
 //}
-
-int main(int argc, char *argv[])
-{
-    PCDReader reader;
-    visualization::PCLVisualizer::Ptr viewer (new visualization::PCLVisualizer ("3D Viewer"));
-
-    viewer->addCoordinateSystem (1.0);
-    viewer->initCameraParameters();
-    viewer->setCameraPosition(0, 0, 1000, 0, 0, 0, 1, 0, 0);
-//    viewer->setCameraFieldOfView(0.523599);
-    /* Read in PointCloud */
-    reader.read ("/Users/nasib/code/HoleDet/data/talstrasse/hololens.pcd", *cloud);
-
-    /* Filtering and Preprocessing */
-    preprocess4HoleDet(cloud);
-
-
-    /* Floor and ceiling Construction */
-    getProjectedFloor(cloud, floor_projected, intermediate);
-    getProjectedFloor(intermediate, ceiling_projected, intermediate);
-
-    *intermediate += *floor_projected;
-    *intermediate += *ceiling_projected;
-
-    /* Mesh Construction */
-    constructMesh(intermediate, mesh);
-
-    /* Visualization */
-    viewer->registerKeyboardCallback (keyboardEventOccurred, (void*)&viewer);
-    viewer->registerPointPickingCallback(pp_callback, (void*)&viewer);
-
-    while (!viewer->wasStopped ())
-    {
-        viewer->spinOnce (100);
-        std::this_thread::sleep_for(10ms);
-    }
-    return 0;
-
-}
