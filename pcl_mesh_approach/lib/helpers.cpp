@@ -1,13 +1,15 @@
 //
 // Created by Nasib Naimi on 23.03.22.
 //
+#include "helpers.h"
+
 #include <pcl/point_types.h>
 #include <pcl/conversions.h>
 
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/Simple_cartesian.h>
 
-int MeshPCL2CGAL(pcl::PolygonMesh::Ptr PCL_mesh, CGAL_Mesh& CGAL_mesh)
+MeshPCL2CGAL(pcl::PolygonMesh::Ptr PCL_mesh, CGAL_Mesh& CGAL_mesh)
 {
     pcl::PointCloud<pcl::PointXYZ>::Ptr mesh_cloud (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::fromPCLPointCloud2( PCL_mesh->cloud, *mesh_cloud );
@@ -48,7 +50,7 @@ int MeshPCL2CGAL(pcl::PolygonMesh::Ptr PCL_mesh, CGAL_Mesh& CGAL_mesh)
 }
 
 
-int MeshCGAL2PCL(CGAL_Mesh CGAL_mesh, pcl::PolygonMesh::Ptr old_PCL_mesh, pcl::PolygonMesh::Ptr PCL_mesh)
+MeshCGAL2PCL(CGAL_Mesh CGAL_mesh, pcl::PolygonMesh::Ptr old_PCL_mesh, pcl::PolygonMesh::Ptr PCL_mesh)
 {
     pcl::PointCloud<pcl::PointXYZ>::Ptr mesh_cloud (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::fromPCLPointCloud2( old_PCL_mesh->cloud, *mesh_cloud );
