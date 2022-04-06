@@ -150,9 +150,9 @@ int main (int argc, char** argv)
     // apply filter
     outrem.filter (*cloud);
 
-    viewer->addPointCloud(cloud,"cloud");
-    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0f, 1.0f, 0.0f, "cloud");
-    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1,"cloud");
+//    viewer->addPointCloud(cloud,"cloud");
+//    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0f, 1.0f, 0.0f, "cloud");
+//    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1,"cloud");
 
     // Voxel filter
     std::cerr << *cloud << std::endl;
@@ -280,9 +280,9 @@ int main (int argc, char** argv)
 
 
 //    std::cout << interior_boundaries;
-    viewer->addPointCloud(interior_boundaries,"bound");
-    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0f, 0.0f, 0.0f, "bound");
-    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5,"bound");
+//    viewer->addPointCloud(interior_boundaries,"bound");
+//    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0f, 0.0f, 0.0f, "bound");
+//    viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5,"bound");
 
 
 
@@ -291,7 +291,7 @@ int main (int argc, char** argv)
     viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0f, 0.2f, 0.8f, "floor");
     viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2,"floor");
 
-    viewer->addCoordinateSystem(2.0);
+//    viewer->addCoordinateSystem(2.0);
 
 
 
