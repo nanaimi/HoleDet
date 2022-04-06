@@ -4,6 +4,7 @@
 #include <vector>
 #include <thread>
 #include <string>
+#include <cmath>
 
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
@@ -12,6 +13,7 @@
 #include <pcl/visualization/cloud_viewer.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/crop_box.h>
+#include <pcl/filters/crop_hull.h>
 #include <pcl/filters/radius_outlier_removal.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/filters/project_inliers.h>
@@ -42,6 +44,8 @@ const float LEAFZ = 0.1;
 const int RADREMRADIUS = 1;
 const int RADREMMINPTS = 5;
 const float IMGRESOLUTION = 0.0694; // [m/px]
+const float MAXTRANS = 5;
+const float MAXANGLE = 10;
 
 // MEMBERS
 PointCloud<PointXYZ>::Ptr cloud_ (new PointCloud<PointXYZ>);
@@ -49,7 +53,6 @@ PointCloud<PointXYZ>::Ptr floor_projected_ (new PointCloud<PointXYZ>);
 PointCloud<PointXYZ>::Ptr floor_ (new PointCloud<PointXYZ>);
 PointCloud<PointXYZ>::Ptr cloud_hull_ (new PointCloud<PointXYZ>);
 PointCloud<PointXYZ>::Ptr floorplan_ (new PointCloud<PointXYZ>);
-PointCloud<PointXYZ>::Ptr floor_zero_ (new PointCloud<PointXYZ>);
 
 struct MouseParams {
     Mat img;
@@ -203,9 +206,10 @@ void FilterPointCLoud(PointCloud<PointXYZ>::Ptr cloud, float leaf_x, float leaf_
 /// \param cloud Input cloud
 /// \param floor The cloud of the floor
 /// \param floor_projected The cloud of all projected points
-void ExtractFloor(const PointCloud<PointXYZ>::Ptr& cloud,
+ModelCoefficients::Ptr ExtractFloor(const PointCloud<PointXYZ>::Ptr& cloud,
                   const PointCloud<PointXYZ>::Ptr& floor,
-                  const PointCloud<PointXYZ>::Ptr& floor_projected) {
+                  const PointCloud<PointXYZ>::Ptr& floor_projected,
+                  const PointCloud<PointXYZ>::Ptr& cloud_hull) {
     // extract floor
     ModelCoefficients::Ptr coefficients (new ModelCoefficients);
     PointIndices::Ptr inliers (new PointIndices);
@@ -236,6 +240,32 @@ void ExtractFloor(const PointCloud<PointXYZ>::Ptr& cloud,
     proj.setInputCloud (floor);
     proj.setModelCoefficients (coefficients);
     proj.filter (*floor_projected);
+
+    // Create a Concave Hull representation of the projected inliers
+    ConcaveHull<PointXYZ> chull;
+    vector<Vertices> polygons;
+    PointCloud<PointXYZ>::Ptr convex_hull (new PointCloud<PointXYZ>);
+    chull.setInputCloud(floor_projected);
+    chull.setAlpha(1);
+    chull.reconstruct(*convex_hull, polygons);
+
+    int max_num_of_points = 0;
+    int idx_polygon;
+    // get index of largest polygon
+    for (int i = 0; i < polygons.size(); i++) {
+        Vertices vertices = polygons[i];
+        int num_of_points = static_cast<int>(vertices.vertices.size());
+        if (num_of_points > max_num_of_points) {
+            max_num_of_points = num_of_points;
+            idx_polygon = i;
+        }
+    }
+
+    for (uint idx: polygons[idx_polygon].vertices) {
+        PointXYZ pt = convex_hull->points[idx];
+        cloud_hull->push_back(pt);
+    }
+    return coefficients;
 }
 
 
@@ -259,7 +289,7 @@ void CreatePointCloudFromImgPts(const PointCloud<PointXYZ>::Ptr& cloud, vector<P
 /// Draws a line between all points in the cloud
 /// \param cloud
 /// \param viewer
-void DrawLinesInCloud(const PointCloud<PointXYZ>::Ptr cloud, const visualization::PCLVisualizer::Ptr viewer) {
+void DrawLinesInCloud(const PointCloud<PointXYZ>::Ptr& cloud, const visualization::PCLVisualizer::Ptr viewer) {
     bool first = true;
     int cnt =  0;
     PointXYZ last_point = cloud->points[0];
@@ -275,20 +305,95 @@ void DrawLinesInCloud(const PointCloud<PointXYZ>::Ptr cloud, const visualization
     viewer->addLine(cloud->points[0], last_point, 1.0, 0.0, 0.0, "line" + to_string(cnt));
 }
 
-void ProjectToZero(const PointCloud<PointXYZ>::Ptr cloud_in, const PointCloud<PointXYZ>::Ptr cloud_out) {
-    // Create a set of planar coefficients with X=Y=0,Z=1
-    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
-    coefficients->values.resize (4);
-    coefficients->values[0] = coefficients->values[1] = 0;
-    coefficients->values[2] = 1.0;
-    coefficients->values[3] = 0;
 
-    // Create the filtering object
+///Computes the rigid transformation from the points in the floorplan and the points in the cloud and then aplies the transform to the floorplan cloud
+/// \param cloud_in The cloud containing the vertices of the floorplan
+/// \param cloud_out The transformed cloud of the floorplan
+/// \param cloud
+/// \param tp The points from the floor (NOT floorplan) cloud
+/// \param max_iteration
+void TransformPointCloud(const PointCloud<PointXYZ>::Ptr& cloud_in,
+                         const PointCloud<PointXYZ>::Ptr& cloud_out,
+                         const PointCloud<PointXYZ>::Ptr& cloud,
+                         TransformPoints tp,
+                         const int max_iteration) {
+    const uint n = cloud_in->width;
+    MatrixXf floor(3, n);
+    MatrixXf end(3, n);
+
+    for (int i = 0; i < n; i++) {
+        floor.col(i) = cloud_in->points[i].getVector3fMap();
+        end.col(i) = tp.points[i];
+    }
+
+    Eigen::Matrix4f trans = Eigen::umeyama(floor, end, true);
+    Eigen::Affine3f t(trans);
+    transformPointCloud(*cloud_in, *cloud_out, t, false);
+
+    // Project the floor and the floorplan to create a true 2d problem z = 0
+    ModelCoefficients::Ptr coefficients (new ModelCoefficients);
+    coefficients->values.resize (4);
+    coefficients->values[0] = 0;
+    coefficients->values[1] = 0;
+    coefficients->values[2] = 1;
     pcl::ProjectInliers<pcl::PointXYZ> proj;
     proj.setModelType (pcl::SACMODEL_PLANE);
-    proj.setInputCloud (cloud_in);
+    proj.setInputCloud (cloud_out);
     proj.setModelCoefficients (coefficients);
     proj.filter (*cloud_out);
+
+    proj.setInputCloud (cloud);
+    proj.filter (*cloud);
+
+    srand(static_cast<unsigned int>(std::time(nullptr)));
+    Vector3f axis (coefficients->values[0], coefficients->values[1], coefficients->values[2]);
+    Vertices::Ptr verticesPtr (new Vertices);
+    vector<uint> vert_vec(n);
+    iota(vert_vec.begin(), vert_vec.end(), 0);
+    verticesPtr->vertices = vert_vec;
+    vector<Vertices> polygon;
+    polygon.push_back(*verticesPtr);
+
+    CropHull<PointXYZ> crop;
+    crop.setHullIndices(polygon);
+    crop.setDim(2);
+
+    PointCloud<PointXYZ>::Ptr cropped_cloud (new PointCloud<PointXYZ>);
+    crop.setHullCloud(cloud_out);
+    crop.setInputCloud(cloud);
+    crop.filter(*cropped_cloud);
+    int max_inlier = cropped_cloud->width;
+    Eigen::Affine3f best_transform = t;
+
+    cout << "Number of inliers before ransacing:\t" << max_inlier << endl;
+
+    for(int it = 0; it < max_iteration; it++) {
+        Eigen::Affine3f rand_t;
+        float angle = (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0 - 1.0) * MAXANGLE / 180.0 * M_PI;
+        float x = (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0 - 1.0) * MAXTRANS;
+        float y = (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0 - 1.0) * MAXTRANS;
+
+        rand_t = AngleAxis<float>(angle, axis);
+        rand_t.translation() = Vector3f(x, y, 0);
+
+        PointCloud<PointXYZ>::Ptr rand_cloud (new PointCloud<PointXYZ>);
+        PointCloud<PointXYZ>::Ptr cropped_cloud (new PointCloud<PointXYZ>);
+        transformPointCloud(*cloud_out, *rand_cloud, rand_t);
+
+        crop.setHullCloud(rand_cloud);
+        crop.filter(*cropped_cloud);
+
+        int inliers = cropped_cloud->width;
+        if(inliers > max_inlier) {
+            max_inlier = inliers;
+            cout << it << ":\t" << max_inlier << endl;
+            best_transform = rand_t;
+        }
+    }
+
+    transformPointCloud(*cloud_out, *cloud_out, best_transform);
+
+
 }
 
 int main() {
@@ -307,19 +412,18 @@ int main() {
     while (!DEBUG) {
         imshow("floorplan", floorplan);
         if (waitKey(10) == 27) {
+            CreatePointCloudFromImgPts(floorplan_, mp.points);
             destroyAllWindows();
             break;
         }
     }
-
-    CreatePointCloudFromImgPts(floorplan_, mp.points);
 //endregion
 
 //region Cloud
     /* VISUALS */
     TransformPoints tp;
     visualization::PCLVisualizer::Ptr viewer(new visualization::PCLVisualizer("Cloud Viewer"));
-    viewer->addCoordinateSystem(2.0);
+    //viewer->addCoordinateSystem(2.0);
     viewer->registerKeyboardCallback(keyboardEventOccurred, (void *) &viewer);
     viewer->registerPointPickingCallback(pp_callback, (void *) &tp);
 
@@ -336,41 +440,17 @@ int main() {
 
 
     // adding floorplan cloud to viewer
-    viewer->addPointCloud(floorplan_, "floorplan");
-    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_COLOR, 0.5f, 0.0f, 0.5f, "floorplan");
-    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "floorplan");
+    //viewer->addPointCloud(floorplan_, "floorplan");
+    //viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_COLOR, 0.5f, 0.0f, 0.5f, "floorplan");
+    //viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "floorplan");
 
     /* PREPROCESSING */
     FilterPointCLoud(cloud_, LEAFX, LEAFY, LEAFZ, RADREMRADIUS, RADREMMINPTS);
     std::cout << "Points after first filtering:\t" << cloud_->width << std::endl;
+    PointCloud<PointXYZ>::Ptr convex_hull (new PointCloud<PointXYZ>);
+    vector<Vertices> polygons;
+    ModelCoefficients::Ptr coefficients = ExtractFloor(cloud_, floor_, floor_projected_, cloud_hull_);
 
-    ExtractFloor(cloud_, floor_, floor_projected_);
-
-    // Create a Concave Hull representation of the projected inliers
-    PointCloud<PointXYZ>::Ptr convex_hull(new PointCloud<PointXYZ>);
-    std::vector<Vertices> polygons;
-    ConcaveHull<PointXYZ> chull;
-    chull.setInputCloud(floor_projected_);
-    chull.setAlpha(1);
-    chull.reconstruct(*convex_hull, polygons);
-
-    int max_num_of_points = 0;
-    int idx_polygon;
-    // get index of largest polygon
-    for (int i = 0; i < polygons.size(); i++) {
-        Vertices vertices = polygons[i];
-        int num_of_points = static_cast<int>(vertices.vertices.size());
-        if (num_of_points > max_num_of_points) {
-            max_num_of_points = num_of_points;
-            idx_polygon = i;
-        }
-    }
-
-
-    for (uint idx: polygons[idx_polygon].vertices) {
-        PointXYZ pt = convex_hull->points[idx];
-        cloud_hull_->push_back(pt);
-    }
     if(DEBUG) {
         /* LOAD FLOORPLAN PC FROM FILE */
         if (io::loadPCDFile<PointXYZ>(floorplan_cloud, *floorplan_) == -1) {
@@ -380,12 +460,12 @@ int main() {
         std::cout << "Loaded floorplan cloud successfully" << std::endl;
     }
 
-    DrawLinesInCloud(floorplan_, viewer);
-    ProjectToZero(floor_projected_, floor_zero_);
+    // DrawLinesInCloud(floorplan_, viewer);
     // adding floor on zero z cloud to viewer
-    viewer->addPointCloud(floor_zero_, "floorzero");
-    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_COLOR, 0.0f, 0.2f, 0.8f, "floorzero");
-    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "floorzero");
+    viewer->addPointCloud(floor_projected_, "floor_projected");
+    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_COLOR, 0.0f, 0.2f, 0.8f, "floor_projected");
+    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 8, "floor_projected");
+
 
     //VISUALS
     if (VISUALS) {
@@ -398,19 +478,29 @@ int main() {
         }
     }
 
-    const uint n = floorplan_->width;
-    MatrixXf floor(3, n);
-    MatrixXf end(3, n);
+    if(false) {
+        tp.points.push_back(Vector3f(0.873, 3.945, -1.659));
+        tp.points.push_back(Vector3f(-21.82 , -7.706, -1.676));
+        tp.points.push_back(Vector3f(-29.849, -15.862, -1.686));
+        tp.points.push_back(Vector3f(-6.039, -39.379, -1.707));
+        tp.points.push_back(Vector3f(-2.963, -35.696, -1.702));
+        tp.points.push_back(Vector3f(-6.352, -31.969, -1.699));
+        tp.points.push_back(Vector3f(-1.835, -27.082, -1.693));
+        tp.points.push_back(Vector3f(-0, -0, 0));
+        tp.points.push_back(Vector3f(-9.614, -25.12, -1.692));
+        tp.points.push_back(Vector3f(-18.149, -16.528, -1.685));
+        tp.points.push_back(Vector3f(-15.862, -14.056, -1.682));
+        tp.points.push_back(Vector3f(-10.258, -10.966, -1.678));
+        tp.points.push_back(Vector3f(-8.472, -14.57, -1.681));
+        tp.points.push_back(Vector3f(-4.688, -12.144, -1.678));
+        tp.points.push_back(Vector3f(-6.861, -9.588, -1.675));
+        tp.points.push_back(Vector3f(-0.471, -5.8, -1.67));
+        tp.points.push_back(Vector3f(7.815, -0.623, -1.664));
 
-    for (int i = 0; i < n; i++) {
-        floor.col(i) = floorplan_->points[i].getVector3fMap();
-        end.col(i) = tp.points[i];
     }
 
-    Eigen::Matrix4f trans = Eigen::umeyama(floor, end, true);
-    Eigen::Affine3f t(trans);
-    PointCloud<PointXYZ>::Ptr transformed_floorplan(new PointCloud<PointXYZ>);
-    transformPointCloud(*floorplan_, *transformed_floorplan, t, false);
+    PointCloud<PointXYZ>::Ptr transformed_floorplan (new PointCloud<PointXYZ>);
+    TransformPointCloud(floorplan_, transformed_floorplan, floor_projected_,tp, 10000);
 
     viewer->removeAllPointClouds();
     viewer->removeAllShapes();
@@ -422,10 +512,10 @@ int main() {
     DrawLinesInCloud(transformed_floorplan, viewer);
 
     // adding floor on zero z cloud to viewer
-    viewer->addPointCloud(floor_zero_, "floorzero");
-    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_COLOR, 0.0f, 0.2f, 0.8f, "floorzero");
-    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "floorzero");
-
+    viewer->addPointCloud(floor_projected_, "floor_projected");
+    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_COLOR, 0.0f, 0.2f, 0.8f, "floor_projected");
+    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "floor_projected");
+    //io::savePCDFileASCII(base_path + "floorplan_cloud.pcd", *transformed_floorplan);
     // VISUALS
     if (VISUALS) {
         while (!viewer->wasStopped()) {
