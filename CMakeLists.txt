@@ -1,16 +1,17 @@
-cmake_minimum_required(VERSION 2.6 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
+
 project(HoleDet)
-find_package(PCL REQUIRED)
-include_directories(${PCL_INCLUDE_DIRS})
+add_subdirectory(libs)
+find_package( Boost REQUIRED)
+
+include_directories(${PROJECT_NAME} ${Boost_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
-add_subdirectory(libs)
-add_library(libs/src/holedet_utils.cpp)
+
+
 add_executable(HoleDet src/main.cpp src/HoleDetector.cpp)
-target_link_libraries(HoleDet ${PCL_LIBRARIES})
-#target_link_libraries(HoleDet libs)
-#target_include_directories(HoleDet PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/libs/include)
-find_package( Boost REQUIRED)
-include_directories(${PROJECT_NAME} ${Boost_INCLUDE_DIRS})
-link_directories(${PROJECT_NAME} ${Boost_LIBRARY_DIRS})
-target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES})
+
+target_include_directories(HoleDet PUBLIC ${PCL_INCLUDE_DIRS})
+target_link_libraries (HoleDet PUBLIC Utils)
+target_link_libraries(${PROJECT_NAME} PUBLIC ${Boost_LIBRARIES})
+target_link_libraries(HoleDet PUBLIC ${PCL_LIBRARIES})
