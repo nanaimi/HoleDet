@@ -6,6 +6,7 @@
 int main (int argc, char** argv)
 {
     HoleDetector holeDetector ("/home/hanlonm/HoleDet/Data/hololens.pcd");
+    holeDetector.setBoundarySearchRadius(0.6);
     holeDetector.detectHoles();
     holeDetector.visualize();
 }

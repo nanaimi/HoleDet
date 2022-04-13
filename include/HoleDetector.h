@@ -13,6 +13,7 @@ public:
 
     void detectHoles();
     void visualize();
+    void setBoundarySearchRadius(const float value);
 
 private:
     std::basic_string<char> pointcloud_file;
@@ -40,20 +41,24 @@ private:
     // Holes
     std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> holes;
     std::vector<int> hole_sizes;
-    double min_size;
     std::vector<pcl::PointXYZ> centers;
     std::vector<double> hole_areas;
 
     // Visualizer
     pcl::visualization::PCLVisualizer::Ptr viewer;
 
+    // Tuning Parameters
+    double min_size;
+    float boundary_search_radius;
+
 
 
     void init_filters();
     void pre_process();
+    void calculate();
 
     void keyboardEventOccurred (const pcl::visualization::KeyboardEvent &event, void* viewer_void);
-    static void keyboard_callback(const pcl::visualization::KeyboardEvent &event, void *viewer_void);
+    void keyboard_callback(const pcl::visualization::KeyboardEvent &event, void *viewer_void);
     static void pp_callback(const pcl::visualization::PointPickingEvent& event, void* viewer_void);
 
 };
