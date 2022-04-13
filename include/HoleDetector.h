@@ -29,17 +29,20 @@ private:
     pcl::PointCloud<pcl::PointXYZ>::Ptr floor;
     pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected;
     pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr hole_hull_cloud;
     pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries;
 
     pcl::ModelCoefficients::Ptr floor_coefficients;
     std::vector<pcl::Vertices> hull_polygons;
     pcl::ConcaveHull<pcl::PointXYZ> chull;
+    pcl::ConvexHull<pcl::PointXYZ> cvxhull;
 
     // Holes
     std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> holes;
     std::vector<int> hole_sizes;
-    int min_size;
+    double min_size;
     std::vector<pcl::PointXYZ> centers;
+    std::vector<double> hole_areas;
 
     // Visualizer
     pcl::visualization::PCLVisualizer::Ptr viewer;
@@ -50,7 +53,8 @@ private:
     void pre_process();
 
     void keyboardEventOccurred (const pcl::visualization::KeyboardEvent &event, void* viewer_void);
-    void pp_callback(const pcl::visualization::PointPickingEvent& event, void* viewer_void);
+    static void keyboard_callback(const pcl::visualization::KeyboardEvent &event, void *viewer_void);
+    static void pp_callback(const pcl::visualization::PointPickingEvent& event, void* viewer_void);
 
 };
 

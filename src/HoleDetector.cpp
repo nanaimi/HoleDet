@@ -9,12 +9,13 @@ filtered_cloud(new pcl::PointCloud<pcl::PointXYZ>),
 floor(new pcl::PointCloud<pcl::PointXYZ>),
 floor_projected(new pcl::PointCloud<pcl::PointXYZ>),
 hull_cloud(new pcl::PointCloud<pcl::PointXYZ>),
+hole_hull_cloud(new pcl::PointCloud<pcl::PointXYZ>),
 interior_boundaries(new pcl::PointCloud<pcl::PointXYZ>),
 viewer (new pcl::visualization::PCLVisualizer ("3D Viewer")),
 floor_coefficients (new pcl::ModelCoefficients)
 {
     pointcloud_file = file_name;
-    min_size = 50;
+    min_size = 0.2;
 }
 
 void HoleDetector::init_filters() {
@@ -44,6 +45,7 @@ void HoleDetector::detectHoles() {
     Utils::getInteriorBoundaries(floor_projected, hull_cloud, interior_boundaries);
     Utils::getHoleClouds(interior_boundaries, holes, hole_sizes);
     Utils::calcHoleCenters(holes, min_size, centers);
+    Utils::calcHoleAreas(holes, hole_areas, cvxhull, hole_hull_cloud);
 
 }
 
@@ -57,7 +59,7 @@ void HoleDetector::visualize() {
     viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2,"floor");
 
     for (int i = 0; i < holes.size(); ++i) {
-        if (holes[i]->points.size() < min_size) { continue; }
+        if (hole_areas[i] < min_size) { continue; }
         auto name = "hole_" + std::to_string(i);
         float r1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
         float r2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
@@ -71,7 +73,7 @@ void HoleDetector::visualize() {
 
 
     }
-//    viewer->registerPointPickingCallback(pp_callback, (void*)&viewer);
+    viewer->registerPointPickingCallback(pp_callback, (void*)&viewer);
 //    viewer->registerKeyboardCallback (keyboardEventOccurred, (void*)&viewer);
     using namespace std::chrono_literals;
     while (!viewer->wasStopped ())
@@ -91,6 +93,7 @@ void HoleDetector::pp_callback(const pcl::visualization::PointPickingEvent &even
         std::cout << x << "; " << y << "; " << z << std::endl;
     }
 }
+
 
 void HoleDetector::keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void *viewer_void) {
     pcl::visualization::PCLVisualizer::Ptr event_viewer = *static_cast<pcl::visualization::PCLVisualizer::Ptr *> (viewer_void);

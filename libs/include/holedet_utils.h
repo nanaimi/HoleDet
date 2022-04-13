@@ -33,7 +33,6 @@
 #include <pcl/common/centroid.h>
 #include <numeric>
 #include <pcl/segmentation/region_growing.h>
-
 class Utils {
     public:
     ///
@@ -68,6 +67,8 @@ class Utils {
     /// \param min_size minimum number of points in hole cloud required
     /// \param centers vector of points representing hole centers
     static void calcHoleCenters(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes, const int &min_size, std::vector<pcl::PointXYZ> &centers);
+
+    static void calcHoleAreas(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes, std::vector<double> &hole_areas, pcl::ConvexHull<pcl::PointXYZ> cvxhull, pcl::PointCloud<pcl::PointXYZ>::Ptr hole_hull_cloud);
 };
 #endif //HOLEDET_HOLEDET_UTILS_H
 

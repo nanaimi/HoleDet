@@ -161,6 +161,25 @@ void Utils::calcHoleCenters(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &ho
     }
 }
 
+void Utils::calcHoleAreas(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes,
+                          std::vector<double> &hole_areas, pcl::ConvexHull<pcl::PointXYZ> cvxhull, pcl::PointCloud<pcl::PointXYZ>::Ptr hole_hull_cloud) {
+    double area;
+    for (int i = 0; i < holes.size(); ++i) {
+        if(holes[i]->size() < 3){
+            area = 0;
+        }
+        else {
+            cvxhull.setComputeAreaVolume(true);
+            cvxhull.setInputCloud(holes[i]);
+            cvxhull.reconstruct(*hole_hull_cloud);
+
+            area = cvxhull.getTotalArea();
+        }
+
+        hole_areas.push_back(area);
+    }
+
+}
 
 
 
