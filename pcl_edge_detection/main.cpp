@@ -5,6 +5,7 @@
 #include <iostream>
 #include <pcl/ModelCoefficients.h>
 #include <pcl/io/pcd_io.h>
+#include<pcl/io/ply_io.h>
 #include <pcl/point_types.h>
 #include <pcl/sample_consensus/method_types.h>
 #include <pcl/sample_consensus/model_types.h>
@@ -116,13 +117,13 @@ int main (int argc, char** argv)
 
     // Fill in the cloud data
     pcl::PCDReader reader;
-    //reader.read ("../data/table_scene_lms400.pcd", *cloud);
-//    reader.read ("/home/hanlonm/HoleDet/Data/projected.pcd", *cloud);
-    reader.read ("/home/hanlonm/HoleDet/Data/hololens.pcd", *cloud);
-    reader.read ("/home/hanlonm/HoleDet/Data/ba_keyframes.pcd", *trajectory);
+    pcl::PLYReader plyReader;
+    //reader.read ("/home/lolo/Documents/HoleDet/data/groundbot.pcd", *cloud);
+    plyReader.read ("/home/lolo/Documents/HoleDet/data/breakroom2.ply", *cloud);
+    //reader.read ("/home/lolo/Documents/HoleDet/data/Talstrasse Data/ba_keyframes.pcd", *trajectory);
     pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
 
-    // Filter out conference room
+    // Filter
     pcl::CropBox<pcl::PointXYZ> boxFilter;
     float conf_min_x = -10;
     float conf_max_x = 10;
@@ -130,15 +131,7 @@ int main (int argc, char** argv)
     float conf_max_y = 10;
     boxFilter.setMin(Eigen::Vector4f(conf_min_x, conf_min_y, -5, 1.0));
     boxFilter.setMax(Eigen::Vector4f(conf_max_x, conf_max_y, 5, 1.0));
-
-//    boxFilter.setMin(Eigen::Vector4f(-30, 10, -5, 1.0));
-//    boxFilter.setMax(Eigen::Vector4f(6, -40, 5, 1.0));
-    boxFilter.setInputCloud(cloud);
-//    boxFilter.filter(*cloud);
-    boxFilter.setInputCloud(trajectory);
-//    boxFilter.filter(*trajectory);
-
-
+    boxFilter.filter(*cloud);
 
     // radius outlier removal
     pcl::RadiusOutlierRemoval<pcl::PointXYZ> outrem;
@@ -153,6 +146,11 @@ int main (int argc, char** argv)
     viewer->addPointCloud(cloud,"cloud");
     viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0f, 1.0f, 0.0f, "cloud");
     viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1,"cloud");
+
+    /*
+//    boxFilter.setInputCloud(trajectory);
+//    boxFilter.filter(*trajectory);
+
 
     // Voxel filter
     std::cerr << *cloud << std::endl;
@@ -470,7 +468,7 @@ int main (int argc, char** argv)
 //    viewer->setBackgroundColor (1, 1, 1);
     viewer->registerPointPickingCallback(pp_callback, (void*)&viewer);
     viewer->registerKeyboardCallback (keyboardEventOccurred, (void*)&viewer);
-
+    */
 
     while (!viewer->wasStopped ())
     {
