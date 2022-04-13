@@ -25,6 +25,24 @@
 - [x] write email sorkine (igl lab) (nasib)
 - [ ] construct and find loops using boundary points (matt)
 
+### Implementaion
+- [ ] Clean up and get main up and running (Moe and Matt)
+- [ ] Integrate floor plan filtering (Matt)
+    - Walls, edges improve hole detection
+- [ ] Test robustness of floor plan filtering (Moe)
+- [ ] determine surfaces of holes (Matt)
+- [ ] Hole data structure (Moe)
+    - Centroid
+    - Point cloud of all boundary points
+    - List of poses
+    - Hole score
+- [ ] Approach to include trajectories
+    - False positives rejected
+- [ ] Modular scoring mechanism
+- [ ] yaml stuff in main (Nasib)
+- [ ] 2D headings
+
+
 ###
 - [x] Goal 1: Approach for hole detection defined (30.03.2022)
 - [ ] Goal 2: Define Holes
