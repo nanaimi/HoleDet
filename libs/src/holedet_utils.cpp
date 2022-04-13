@@ -98,8 +98,8 @@ void Utils::getInteriorBoundaries(pcl::PointCloud<pcl::PointXYZ>::Ptr input_clou
 }
 
 void Utils::getHoleClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries,
-                                     std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> holes,
-                                     std::vector<int> hole_sizes) {
+                                     std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes,
+                                     std::vector<int> &hole_sizes) {
     pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
     kdtree.setInputCloud(interior_boundaries);
 
@@ -149,10 +149,9 @@ void Utils::getHoleClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundarie
 
 }
 
-void Utils::calcHoleCenters(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> holes,
-                                       const int &min_size, std::vector<pcl::PointXYZ> centers) {
+void Utils::calcHoleCenters(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes,
+                                       const int &min_size, std::vector<pcl::PointXYZ> &centers) {
     for (int i = 0; i < holes.size(); ++i) {
-        if (holes[i]->points.size() < min_size) { continue; }
 
         Eigen::Matrix<float, 4, 1> hole_center;
         pcl::compute3DCentroid(*holes[i], hole_center);

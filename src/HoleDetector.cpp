@@ -14,7 +14,7 @@ viewer (new pcl::visualization::PCLVisualizer ("3D Viewer")),
 floor_coefficients (new pcl::ModelCoefficients)
 {
     pointcloud_file = file_name;
-    min_size = 10;
+    min_size = 50;
 }
 
 void HoleDetector::init_filters() {
@@ -57,7 +57,7 @@ void HoleDetector::visualize() {
     viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2,"floor");
 
     for (int i = 0; i < holes.size(); ++i) {
-        if (holes[i]->points.size() < 10) { continue; }
+        if (holes[i]->points.size() < min_size) { continue; }
         auto name = "hole_" + std::to_string(i);
         float r1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
         float r2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
@@ -67,13 +67,18 @@ void HoleDetector::visualize() {
         viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, name);
 
         auto center_name = "hole_center_" + std::to_string(i);
-        viewer->addSphere(centers[i],0.3,1.0,1.0,0.0, center_name);
+        viewer->addSphere(centers[i],0.3,r1,1 - r1,r3, center_name);
 
 
     }
 //    viewer->registerPointPickingCallback(pp_callback, (void*)&viewer);
 //    viewer->registerKeyboardCallback (keyboardEventOccurred, (void*)&viewer);
-
+    using namespace std::chrono_literals;
+    while (!viewer->wasStopped ())
+    {
+        viewer->spinOnce (100);
+        std::this_thread::sleep_for(10ms);
+    }
 
 }
 
