@@ -5,8 +5,9 @@
 
 int main (int argc, char** argv)
 {
-    HoleDetector holeDetector ("/home/hanlonm/HoleDet/Data/hololens.pcd");
-    holeDetector.setBoundarySearchRadius(0.6);
+    HoleDetector holeDetector ("/home/hanlonm/HoleDet/Data/hololens.pcd",
+                               "/home/hanlonm/HoleDet/Data/floorplan.jpg" );
     holeDetector.detectHoles();
+    holeDetector.getFloorplanCloud(true, "/home/hanlonm/HoleDet/Data/floorplan.pcd");
     holeDetector.visualize();
 }

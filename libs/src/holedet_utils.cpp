@@ -2,7 +2,7 @@
 // Created by hanlonm on 06.04.22.
 //
 
-#include "../include/holedet_utils.h"
+#include "holedet_utils.h"
 pcl::PointCloud<pcl::PointXYZ>::Ptr Utils::readCloud(const std::basic_string<char> &file_name, pcl::PCDReader &reader) {
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
     reader.read(file_name, *cloud);
@@ -158,6 +158,122 @@ void Utils::calcHoleCenters(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &ho
 
         centers.push_back(center);
     }
+}
+
+void Utils::createPointCloudFromImgPts(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
+                                       std::vector<cv::Point> img_pts,
+                                       const float img_resolution) {
+    pcl::PointXYZ last_pt (0, 0, 0);
+    cloud->push_back(last_pt);
+    for(int i = 1; i < img_pts.size(); i++) {
+        float x_diff = static_cast<float>(img_pts[i].x - img_pts[i - 1].x) * img_resolution;
+        float y_diff = static_cast<float>(img_pts[i].y - img_pts[i - 1].y) * img_resolution;
+        float x = last_pt.x + x_diff;
+        float y = last_pt.y + y_diff;
+        last_pt  = pcl::PointXYZ(x, y, 0);
+        cloud->push_back(last_pt);
+    }
+}
+
+void Utils::drawLinesInCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
+                                 const pcl::visualization::PCLVisualizer::Ptr viewer) {
+    bool first = true;
+    int cnt =  0;
+    pcl::PointXYZ last_point = cloud->points[0];
+    for (auto point : *cloud) {
+        if (first) {
+            first = false;
+            continue;
+        }
+        viewer->addLine(point, last_point, 1.0, 0.0, 0.0, "line" + std::to_string(cnt));
+        last_point = point;
+        cnt++;
+    }
+    viewer->addLine(cloud->points[0], last_point, 1.0, 0.0, 0.0, "line" + std::to_string(cnt));
+}
+
+void Utils::transformPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_in,
+                                const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
+                                std::vector<Eigen::Vector3f> points,
+                                const int max_iteration,
+                                const int max_angle,
+                                const int max_translation) {
+    const uint n = cloud_in->width;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_out (new pcl::PointCloud<pcl::PointXYZ>);
+    Eigen::MatrixXf floor(3, n);
+    Eigen::MatrixXf end(3, n);
+
+    for (int i = 0; i < n; i++) {
+        floor.col(i) = cloud_in->points[i].getVector3fMap();
+        end.col(i) = points[i];
+    }
+
+    Eigen::Matrix4f trans = Eigen::umeyama(floor, end, true);
+    Eigen::Affine3f t(trans);
+    pcl::transformPointCloud(*cloud_in, *cloud_out, t, false);
+
+    // Project the floor and the floorplan to create a true 2d problem z = 0
+    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
+    coefficients->values.resize (4);
+    coefficients->values[0] = 0;
+    coefficients->values[1] = 0;
+    coefficients->values[2] = 1;
+    pcl::ProjectInliers<pcl::PointXYZ> proj;
+    proj.setModelType (pcl::SACMODEL_PLANE);
+    proj.setInputCloud (cloud_out);
+    proj.setModelCoefficients (coefficients);
+    proj.filter (*cloud_out);
+
+    proj.setInputCloud (cloud);
+    proj.filter (*cloud);
+
+    srand(static_cast<unsigned int>(std::time(nullptr)));
+    Eigen::Vector3f axis (coefficients->values[0], coefficients->values[1], coefficients->values[2]);
+    pcl::Vertices::Ptr verticesPtr (new pcl::Vertices);
+    std::vector<uint> vert_vec(n);
+    iota(vert_vec.begin(), vert_vec.end(), 0);
+    verticesPtr->vertices = vert_vec;
+    std::vector<pcl::Vertices> polygon;
+    polygon.push_back(*verticesPtr);
+
+    pcl::CropHull<pcl::PointXYZ> crop;
+    crop.setHullIndices(polygon);
+    crop.setDim(2);
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cropped_cloud (new pcl::PointCloud<pcl::PointXYZ>);
+    crop.setHullCloud(cloud_out);
+    crop.setInputCloud(cloud);
+    crop.filter(*cropped_cloud);
+    int max_inlier = static_cast<int>(cropped_cloud->width);
+    Eigen::Affine3f best_transform = t;
+
+    cout << "Number of inliers before ransacing:\t" << max_inlier << endl;
+
+    for(int it = 0; it < max_iteration; it++) {
+        Eigen::Affine3f rand_t;
+        float angle = (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0 - 1.0) * max_angle / 180.0 * M_PI;
+        float x = (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0 - 1.0) * max_translation;
+        float y = (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0 - 1.0) * max_translation;
+
+        rand_t = Eigen::AngleAxis<float>(angle, axis);
+        rand_t.translation() = Eigen::Vector3f(x, y, 0);
+
+        pcl::PointCloud<pcl::PointXYZ>::Ptr rand_cloud (new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cropped_cloud2 (new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::transformPointCloud(*cloud_out, *rand_cloud, rand_t);
+
+        crop.setHullCloud(rand_cloud);
+        crop.filter(*cropped_cloud2);
+
+        int inliers = cropped_cloud2->width;
+        if(inliers > max_inlier) {
+            max_inlier = inliers;
+            cout << it << ":\t" << max_inlier << endl;
+            best_transform = rand_t;
+        }
+    }
+
+    pcl::transformPointCloud(*cloud_out, *cloud_in, best_transform);
 }
 
 void Utils::calcHoleAreas(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes,

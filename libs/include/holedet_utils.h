@@ -5,34 +5,41 @@
 #ifndef HOLEDET_HOLEDET_UTILS_H
 #define HOLEDET_HOLEDET_UTILS_H
 
-#include <pcl/point_types.h>
-#include <pcl/io/pcd_io.h>
 #include <iostream>
-#include <pcl/ModelCoefficients.h>
-#include <pcl/io/pcd_io.h>
-#include <pcl/point_types.h>
-#include <pcl/sample_consensus/method_types.h>
-#include <pcl/sample_consensus/model_types.h>
-#include <pcl/segmentation/sac_segmentation.h>
-#include <pcl/filters/radius_outlier_removal.h>
-#include <pcl/filters/extract_indices.h>
-#include <pcl/visualization/pcl_visualizer.h>
+#include <vector>
 #include <thread>
 #include <math.h>
 #include <string>
+#include <numeric>
+
+#include <pcl/point_types.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/common/centroid.h>
+#include <pcl/ModelCoefficients.h>
+#include <pcl/visualization/pcl_visualizer.h>
+#include <pcl/sample_consensus/method_types.h>
+#include <pcl/sample_consensus/model_types.h>
+#include <pcl/sample_consensus/sac_model_normal_plane.h>
+#include <pcl/segmentation/sac_segmentation.h>
+#include <pcl/segmentation/region_growing.h>
+#include <pcl/filters/radius_outlier_removal.h>
+#include <pcl/filters/extract_indices.h>
 #include <pcl/filters/voxel_grid.h>
+#include <pcl/filters/project_inliers.h>
+#include <pcl/filters/crop_box.h>
+#include <pcl/filters/crop_hull.h>
 #include <pcl/features/boundary.h>
 #include <pcl/features/normal_3d.h>
-#include <pcl/sample_consensus/sac_model_normal_plane.h>
-#include <pcl/filters/project_inliers.h>
 #include <pcl/surface/concave_hull.h>
 #include <pcl/surface/convex_hull.h>
-#include <pcl/filters/crop_box.h>
-#include <pcl/ml/kmeans.h>
 #include <pcl/surface/gp3.h>
-#include <pcl/common/centroid.h>
-#include <numeric>
-#include <pcl/segmentation/region_growing.h>
+#include <pcl/ml/kmeans.h>
+
+#include <opencv2/opencv.hpp>
+#include <opencv2/core/types.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+
 class Utils {
     public:
     ///
@@ -69,6 +76,33 @@ class Utils {
     static void calcHoleCenters(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes, const int &min_size, std::vector<pcl::PointXYZ> &centers);
 
     static void calcHoleAreas(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes, std::vector<double> &hole_areas, pcl::ConvexHull<pcl::PointXYZ> cvxhull, pcl::PointCloud<pcl::PointXYZ>::Ptr hole_hull_cloud);
+
+    /// Creates a Point Cloud from the image points vector
+    /// \param cloud
+    /// \param img_pts
+    static void createPointCloudFromImgPts(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
+                                           std::vector<cv::Point> img_pts,
+                                           const float img_resolution);
+
+    /// Draws a line between all points in the cloud
+    /// \param cloud
+    /// \param viewer
+    static void drawLinesInCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
+                                 const pcl::visualization::PCLVisualizer::Ptr viewer);
+
+    /// Computes the rigid transformation from the points in the floorplan and the points in the cloud and then aplies the transform to the floorplan cloud
+    /// \param cloud_in The cloud containing the vertices of the floorplan
+    /// \param cloud The cloud of the projected floor
+    /// \param points The points from the floor (NOT floorplan) cloud
+    /// \param max_iteration Number of max ransac iterations
+    /// \param max_angle Max angle for random transformation
+    /// \param max_translation Max Translation for random transformation
+    static void transformPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_in,
+                                    const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
+                                    std::vector<Eigen::Vector3f> points,
+                                    const int max_iteration,
+                                    const int max_angle,
+                                    const int max_translation);
 };
 #endif //HOLEDET_HOLEDET_UTILS_H
 
