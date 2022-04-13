@@ -5,52 +5,81 @@
 #ifndef HOLEDET_HOLEDETECTOR_H
 #define HOLEDET_HOLEDETECTOR_H
 
-#include "include/holedet_utils.h"
+#include "holedet_utils.h"
+
+using namespace pcl;
+using namespace Eigen;
+using namespace std;
+
+struct MouseParams {
+    cv::Mat img;
+    vector<cv::Point> points;
+};
+
+struct TransformPoints {
+    vector<Vector3f> points;
+    int cnt;
+};
 
 class HoleDetector {
 public:
-    HoleDetector(const std::basic_string<char> &file_name);
+    HoleDetector(const std::basic_string<char> &file_name, const std::basic_string<char> &floorplan_path);
 
     void detectHoles();
+    void getFloorplanCloud(bool debug, string floorplan_path);
     void visualize();
 
 private:
-    std::basic_string<char> pointcloud_file;
-    pcl::PCDReader reader;
+    // constants TODO Move to yaml file
+    const float kImgResolution_ = 0.0694; // [m/px]
+    const int kMaxIteration_ = 10000;
+    const int kMaxTranslation_ = 5;
+    const int kMaxAngle_ = 10; // [deg]
+
+    basic_string<char> pointcloud_file_;
+    basic_string<char> floorplan_file_;
+    PCDReader reader;
+
+    // Point Picking
+    MouseParams mp_;
+    TransformPoints tp_;
 
     // Filters
-    pcl::RadiusOutlierRemoval<pcl::PointXYZ> outrem;
-    pcl::VoxelGrid<pcl::PointXYZ> voxel_filter;
+    RadiusOutlierRemoval<PointXYZ> outrem;
+    VoxelGrid<PointXYZ> voxel_filter;
 
 
     // Clouds
-    pcl::PointCloud<pcl::PointXYZ>::Ptr raw_cloud;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr floor;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries;
+    PointCloud<PointXYZ>::Ptr raw_cloud;
+    PointCloud<PointXYZ>::Ptr filtered_cloud;
+    PointCloud<PointXYZ>::Ptr floor;
+    PointCloud<PointXYZ>::Ptr floor_projected_;
+    PointCloud<PointXYZ>::Ptr hull_cloud;
+    PointCloud<PointXYZ>::Ptr interior_boundaries;
+    PointCloud<PointXYZ>::Ptr floorplan_;
 
-    pcl::ModelCoefficients::Ptr floor_coefficients;
-    std::vector<pcl::Vertices> hull_polygons;
-    pcl::ConcaveHull<pcl::PointXYZ> chull;
+    ModelCoefficients::Ptr floor_coefficients;
+    vector<Vertices> hull_polygons;
+    ConcaveHull<PointXYZ> chull;
 
     // Holes
-    std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> holes;
-    std::vector<int> hole_sizes;
+    vector<PointCloud<PointXYZ>::Ptr> holes;
+    vector<int> hole_sizes;
     int min_size;
-    std::vector<pcl::PointXYZ> centers;
+    vector<PointXYZ> centers;
 
     // Visualizer
-    pcl::visualization::PCLVisualizer::Ptr viewer;
+    visualization::PCLVisualizer::Ptr viewer;
 
 
 
     void init_filters();
     void pre_process();
 
-    void keyboardEventOccurred (const pcl::visualization::KeyboardEvent &event, void* viewer_void);
-    void pp_callback(const pcl::visualization::PointPickingEvent& event, void* viewer_void);
+    void keyboardEventOccurred (const visualization::KeyboardEvent &event, void* viewer_void);
+    void pp_callback(const visualization::PointPickingEvent& event, void* viewer_void);
+    static void point_picker_cb(const visualization::PointPickingEvent& event, void* param);
+    static void onMouse(int event, int x, int y, int flags, void* param);
 
 };
 
