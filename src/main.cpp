@@ -1,7 +1,7 @@
 //
 // Created by hanlonm on 06.04.22.
 //
-#include "../include/HoleDetector.h"
+#include "HoleDetector.h"
 
 int main (int argc, char** argv)
 {

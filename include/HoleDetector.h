@@ -5,8 +5,7 @@
 #ifndef HOLEDET_HOLEDETECTOR_H
 #define HOLEDET_HOLEDETECTOR_H
 
-#include "../libs/include/holedet_utils.h"
-
+#include "include/holedet_utils.h"
 
 class HoleDetector {
 public:

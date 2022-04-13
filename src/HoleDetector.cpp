@@ -2,8 +2,7 @@
 // Created by hanlonm on 06.04.22.
 //
 
-#include "../include/HoleDetector.h"
-
+#include "HoleDetector.h"
 HoleDetector::HoleDetector(const std::basic_string<char> &file_name):
 raw_cloud(new pcl::PointCloud<pcl::PointXYZ>),
 filtered_cloud(new pcl::PointCloud<pcl::PointXYZ>),
@@ -38,13 +37,13 @@ void HoleDetector::pre_process() {
 
 void HoleDetector::detectHoles() {
     init_filters();
-    raw_cloud = readCloud(pointcloud_file, reader);
+    raw_cloud = Utils::readCloud(pointcloud_file, reader);
     pre_process();
-    extractAndProjectFloor(filtered_cloud, floor, floor_projected, floor_coefficients);
-    createConcaveHull(floor_projected, hull_cloud, hull_polygons, chull);
-    getInteriorBoundaries(floor_projected, hull_cloud, interior_boundaries);
-    getHoleClouds(interior_boundaries, holes, hole_sizes);
-    calcHoleCenters(holes, min_size, centers);
+    Utils::extractAndProjectFloor(filtered_cloud, floor, floor_projected, floor_coefficients);
+    Utils::createConcaveHull(floor_projected, hull_cloud, hull_polygons, chull);
+    Utils::getInteriorBoundaries(floor_projected, hull_cloud, interior_boundaries);
+    Utils::getHoleClouds(interior_boundaries, holes, hole_sizes);
+    Utils::calcHoleCenters(holes, min_size, centers);
 
 }
 

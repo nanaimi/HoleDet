@@ -1,11 +1,10 @@
-cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
-find_package(PCL REQUIRED)
+cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
 
+include(GenerateExportHeader)
+find_package(PCL REQUIRED)
+include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
-add_library(Utils src/holedet_utils.cpp)
-target_include_directories(Utils PUBLIC ${PCL_INCLUDE_DIRS})
-target_link_libraries(Utils ${CMAKE_CURRENT_SOURCE_DIR}/include/holedet_utils.h)
+add_library(Utils SHARED src/holedet_utils.cpp include/holedet_utils.h)
 target_link_libraries(Utils ${PCL_LIBRARIES})
-
