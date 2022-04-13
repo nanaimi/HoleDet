@@ -46,46 +46,36 @@ class Utils {
     /// \param file_name string, e.g "hololens.pcd"
     /// \param reader pcl::PCDReader reader
     /// \return shared pointer pcl::PointCloud<pcl::PointXYZ>::Ptr
-    static pcl::PointCloud<pcl::PointXYZ>::Ptr readCloud(const std::basic_string<char> &file_name,
-                                                         pcl::PCDReader &reader);
+    static pcl::PointCloud<pcl::PointXYZ>::Ptr readCloud(const std::basic_string<char> &file_name, pcl::PCDReader &reader);
     ///
     /// \param cloud input point cloud
     /// \param floor cloud to which unprojected floor will be extracted
     /// \param floor_projected floor cloud projected to the estimated plane equation
     /// \param coefficients coefficients of the estimated plane equation
-    static void extractAndProjectFloor(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
-                                       pcl::PointCloud<pcl::PointXYZ>::Ptr floor,
-                                       pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected,
-                                       pcl::ModelCoefficients::Ptr coefficients);
+    static void extractAndProjectFloor(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr floor, pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected, pcl::ModelCoefficients::Ptr coefficients);
     ///
     /// \param input_cloud input point cloud
     /// \param hull_cloud point cloud containing the points on the concave hull
     /// \param polygons the resultant concave hull polygons, as a set of vertices. The Vertices structure contains an array of point indices.
     /// \param chull PCL concave hull object
-    static void createConcaveHull(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud,
-                                  pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud,
-                                  std::vector<pcl::Vertices> polygons,
-                                  pcl::ConcaveHull<pcl::PointXYZ> chull);
+    static void createConcaveHull(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud, std::vector<pcl::Vertices> polygons, pcl::ConcaveHull<pcl::PointXYZ> chull);
     ///
     /// \param input_cloud input point cloud
     /// \param hull_cloud point cloud containing the points on the concave hull
     /// \param interior_boundaries point cloud containing the interior boundary points
-    static void getInteriorBoundaries(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud,
-                                      pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud,
-                                      pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries);
+    static void getInteriorBoundaries(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries);
     ///
     /// \param interior_boundaries point cloud containing the interior boundary points
     /// \param holes vector containing the point clouds for the individual holes
     /// \param hole_sizes number of points in each hole point cloud
-    static void getHoleClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries,
-                              std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes,
-                              std::vector<int> &hole_sizes);
+    static void getHoleClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries, const float n_search_radius, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes, std::vector<int> &hole_sizes);
     ///
     /// \param holes vector containing the point clouds for the individual holes
     /// \param min_size minimum number of points in hole cloud required
     /// \param centers vector of points representing hole centers
-    static void calcHoleCenters(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes,
-                                const int &min_size, std::vector<pcl::PointXYZ> &centers);
+    static void calcHoleCenters(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes, const int &min_size, std::vector<pcl::PointXYZ> &centers);
+
+    static void calcHoleAreas(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes, std::vector<double> &hole_areas, pcl::ConvexHull<pcl::PointXYZ> cvxhull, pcl::PointCloud<pcl::PointXYZ>::Ptr hole_hull_cloud);
 
     /// Creates a Point Cloud from the image points vector
     /// \param cloud

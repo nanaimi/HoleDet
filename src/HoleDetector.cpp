@@ -15,15 +15,19 @@ HoleDetector::HoleDetector(const basic_string<char> &file_name, const std::basic
         floor(new PointCloud<PointXYZ>),
         floor_projected_(new PointCloud<PointXYZ>),
         hull_cloud(new PointCloud<PointXYZ>),
+        hole_hull_cloud(new PointCloud<pcl::PointXYZ>),
         interior_boundaries(new PointCloud<PointXYZ>),
         floorplan_(new PointCloud<PointXYZ>),
         viewer (new visualization::PCLVisualizer ("3D Viewer")),
         floor_coefficients (new ModelCoefficients)
+
 {
     pointcloud_file_ = file_name;
     floorplan_file_ = floorplan_path;
     min_size = 50;
     tp_.cnt = 0;
+    min_size = 0.2;
+    boundary_search_radius = 0.6;
 }
 
 void HoleDetector::init_filters() {
@@ -51,8 +55,18 @@ void HoleDetector::detectHoles() {
     Utils::extractAndProjectFloor(filtered_cloud, floor, floor_projected_, floor_coefficients);
     Utils::createConcaveHull(floor_projected_, hull_cloud, hull_polygons, chull);
     Utils::getInteriorBoundaries(floor_projected_, hull_cloud, interior_boundaries);
-    Utils::getHoleClouds(interior_boundaries, holes, hole_sizes);
+    calculate();
+
+}
+
+void HoleDetector::calculate() {
+    hole_areas.clear();
+    centers.clear();
+    hole_sizes.clear();
+    holes.clear();
+    Utils::getHoleClouds(interior_boundaries, boundary_search_radius, holes, hole_sizes);
     Utils::calcHoleCenters(holes, min_size, centers);
+    Utils::calcHoleAreas(holes, hole_areas, cvxhull, hole_hull_cloud);
 
 }
 
@@ -75,7 +89,7 @@ void HoleDetector::visualize() {
     Utils::drawLinesInCloud(floorplan_, viewer);
 
     for (int i = 0; i < holes.size(); ++i) {
-        if (holes[i]->points.size() < min_size) { continue; }
+        if (hole_areas[i] < min_size) { continue; }
         auto name = "hole_" + std::to_string(i);
         float r1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
         float r2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
@@ -89,8 +103,10 @@ void HoleDetector::visualize() {
 
 
     }
-//    viewer->registerPointPickingCallback(pp_callback, (void*)&viewer);
-//    viewer->registerKeyboardCallback (keyboardEventOccurred, (void*)&viewer);
+
+    viewer->registerPointPickingCallback(pp_callback, (void*)&viewer);
+    viewer->registerKeyboardCallback (&HoleDetector::keyboardEventOccurred, *this, (void*)&viewer);
+    using namespace std::chrono_literals;
     while (!viewer->wasStopped ())
     {
         viewer->spinOnce (100);
@@ -140,8 +156,12 @@ void HoleDetector::getFloorplanCloud(bool debug, string floorplan_path) {
 
 }
 
-void HoleDetector::pp_callback(const visualization::PointPickingEvent &event, void *viewer_void) {
-    cout << "Picking event active" << endl;
+void HoleDetector::setBoundarySearchRadius(const float value) {
+    boundary_search_radius = value;
+}
+
+void HoleDetector::pp_callback(const pcl::visualization::PointPickingEvent &event, void *viewer_void) {
+    std::cout << "Picking event active" << std::endl;
     if(event.getPointIndex() != -1)
     {
         float x, y, z;
@@ -165,6 +185,25 @@ void HoleDetector::keyboardEventOccurred(const visualization::KeyboardEvent &eve
             event_viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR, 0.0f, 1.0f, 0.0f, "cloud");
             event_viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2,"cloud");
         }
+    }
+
+    if (event.getKeySym () == "i" && event.keyDown ()){
+        event_viewer->removeAllShapes();
+        event_viewer->removeAllPointClouds();
+        boundary_search_radius += 0.1;
+        cout << "i was pressed => increasing the boundary point search radius by 0.1" << endl;
+        calculate();
+        visualize();
+
+    }
+    if (event.getKeySym () == "r" && event.keyDown ()){
+        event_viewer->removeAllShapes();
+        event_viewer->removeAllPointClouds();
+        boundary_search_radius -= 0.1;
+        cout << "i was pressed => reducing the boundary point search radius by 0.1" << endl;
+        calculate();
+        visualize();
+
     }
 }
 

@@ -5,9 +5,9 @@
 
 int main (int argc, char** argv)
 {
-    HoleDetector holeDetector ("/home/maurice/ETH/HoleDet/data/hololens.pcd",
-                               "/home/maurice/ETH/HoleDet/data/floorplan.jpg" );
+    HoleDetector holeDetector ("/home/hanlonm/HoleDet/Data/hololens.pcd",
+                               "/home/hanlonm/HoleDet/Data/floorplan.jpg" );
     holeDetector.detectHoles();
-    holeDetector.getFloorplanCloud(false, "/home/maurice/ETH/HoleDet/data/floorplan.pcd");
+    holeDetector.getFloorplanCloud(true, "/home/hanlonm/HoleDet/Data/floorplan.pcd");
     holeDetector.visualize();
 }

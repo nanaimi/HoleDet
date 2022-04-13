@@ -97,7 +97,7 @@ void Utils::getInteriorBoundaries(pcl::PointCloud<pcl::PointXYZ>::Ptr input_clou
     }
 }
 
-void Utils::getHoleClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries,
+void Utils::getHoleClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries, const float n_search_radius,
                                      std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes,
                                      std::vector<int> &hole_sizes) {
     pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
@@ -105,7 +105,6 @@ void Utils::getHoleClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundarie
 
     std::vector<int> visited;
     int point_idx;
-    float search_radius = 0.6;
 
     for (int i = 0; i < interior_boundaries->points.size(); ++i) {
         int start_point = i;
@@ -121,7 +120,7 @@ void Utils::getHoleClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundarie
 
         std::deque<int> to_visit;
         do {
-            kdtree.radiusSearch(search_point, search_radius, pointIdxRadiusSearch, pointRadiusSquaredDistance);
+            kdtree.radiusSearch(search_point, n_search_radius, pointIdxRadiusSearch, pointRadiusSquaredDistance);
 
             for (auto p: pointIdxRadiusSearch) {
                 if (!std::count(visited.begin(), visited.end(), p) &&
@@ -277,6 +276,25 @@ void Utils::transformPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud
     pcl::transformPointCloud(*cloud_out, *cloud_in, best_transform);
 }
 
+void Utils::calcHoleAreas(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes,
+                          std::vector<double> &hole_areas, pcl::ConvexHull<pcl::PointXYZ> cvxhull, pcl::PointCloud<pcl::PointXYZ>::Ptr hole_hull_cloud) {
+    double area;
+    for (int i = 0; i < holes.size(); ++i) {
+        if(holes[i]->size() < 3){
+            area = 0;
+        }
+        else {
+            cvxhull.setComputeAreaVolume(true);
+            cvxhull.setInputCloud(holes[i]);
+            cvxhull.reconstruct(*hole_hull_cloud);
+
+            area = cvxhull.getTotalArea();
+        }
+
+        hole_areas.push_back(area);
+    }
+
+}
 
 
 

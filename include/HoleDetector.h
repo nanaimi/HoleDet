@@ -28,6 +28,7 @@ public:
     void detectHoles();
     void getFloorplanCloud(bool debug, string floorplan_path);
     void visualize();
+    void setBoundarySearchRadius(const float value);
 
 private:
     // constants TODO Move to yaml file
@@ -50,34 +51,40 @@ private:
 
 
     // Clouds
-    PointCloud<PointXYZ>::Ptr raw_cloud;
-    PointCloud<PointXYZ>::Ptr filtered_cloud;
-    PointCloud<PointXYZ>::Ptr floor;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr raw_cloud;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr floor;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr hole_hull_cloud;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries;
     PointCloud<PointXYZ>::Ptr floor_projected_;
-    PointCloud<PointXYZ>::Ptr hull_cloud;
-    PointCloud<PointXYZ>::Ptr interior_boundaries;
     PointCloud<PointXYZ>::Ptr floorplan_;
 
-    ModelCoefficients::Ptr floor_coefficients;
-    vector<Vertices> hull_polygons;
-    ConcaveHull<PointXYZ> chull;
+    pcl::ModelCoefficients::Ptr floor_coefficients;
+    std::vector<pcl::Vertices> hull_polygons;
+    pcl::ConcaveHull<pcl::PointXYZ> chull;
+    pcl::ConvexHull<pcl::PointXYZ> cvxhull;
 
     // Holes
-    vector<PointCloud<PointXYZ>::Ptr> holes;
-    vector<int> hole_sizes;
-    int min_size;
-    vector<PointXYZ> centers;
-
+    std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> holes;
+    std::vector<int> hole_sizes;
+    std::vector<pcl::PointXYZ> centers;
+    std::vector<double> hole_areas;
     // Visualizer
     visualization::PCLVisualizer::Ptr viewer;
+
+    // Tuning Parameters
+    double min_size;
+    float boundary_search_radius;
 
 
 
     void init_filters();
     void pre_process();
+    void calculate();
 
     void keyboardEventOccurred (const visualization::KeyboardEvent &event, void* viewer_void);
-    void pp_callback(const visualization::PointPickingEvent& event, void* viewer_void);
+    static void pp_callback(const visualization::PointPickingEvent& event, void* viewer_void);
     static void point_picker_cb(const visualization::PointPickingEvent& event, void* param);
     static void onMouse(int event, int x, int y, int flags, void* param);
 
