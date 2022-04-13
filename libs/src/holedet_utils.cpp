@@ -152,7 +152,6 @@ void Utils::getHoleClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundarie
 void Utils::calcHoleCenters(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes,
                                        const int &min_size, std::vector<pcl::PointXYZ> &centers) {
     for (int i = 0; i < holes.size(); ++i) {
-        if (holes[i]->points.size() < min_size) { continue; }
 
         Eigen::Matrix<float, 4, 1> hole_center;
         pcl::compute3DCentroid(*holes[i], hole_center);
