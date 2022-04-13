@@ -62,12 +62,12 @@ class Utils {
     /// \param interior_boundaries point cloud containing the interior boundary points
     /// \param holes vector containing the point clouds for the individual holes
     /// \param hole_sizes number of points in each hole point cloud
-    static void getHoleClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> holes, std::vector<int> hole_sizes);
+    static void getHoleClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes, std::vector<int> &hole_sizes);
     ///
     /// \param holes vector containing the point clouds for the individual holes
     /// \param min_size minimum number of points in hole cloud required
     /// \param centers vector of points representing hole centers
-    static void calcHoleCenters(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> holes, const int &min_size, std::vector<pcl::PointXYZ> centers);
+    static void calcHoleCenters(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes, const int &min_size, std::vector<pcl::PointXYZ> &centers);
 };
 #endif //HOLEDET_HOLEDET_UTILS_H
 
