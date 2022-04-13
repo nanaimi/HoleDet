@@ -41,6 +41,8 @@
 - [ ] Modular scoring mechanism
 - [ ] yaml stuff in main (Nasib)
 - [ ] 2D headings
+- [ ] Write a ReadMe
+- [ ] Presentation for 25th of April
 
 
 ###
