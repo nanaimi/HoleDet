@@ -103,6 +103,8 @@ class Utils {
                                     const int max_iteration,
                                     const int max_angle,
                                     const int max_translation);
+
+    static void denseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr& floorplan, pcl::PointCloud<pcl::PointXYZ>::Ptr& dense_cloud, const float z);
 };
 #endif //HOLEDET_HOLEDET_UTILS_H
 

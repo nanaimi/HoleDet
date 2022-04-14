@@ -296,5 +296,43 @@ void Utils::calcHoleAreas(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &hole
 
 }
 
+void Utils::denseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &floorplan,
+                                  pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud, const float z) {
+    bool first = true;
+    pcl::PointXYZ last_point = floorplan->points[0];
+    for (auto point : *floorplan) {
+        if (first) {
+            first = false;
+            continue;
+        }
+        // do stuff
+        float dx = last_point.x - point.x;
+        float dy = last_point.y - point.y;
+
+        for (float i = 0.0; i <= 1; i+=0.001) {
+            pcl::PointXYZ new_point;
+            new_point.x = point.x + i * dx;
+            new_point.y = point.y + i * dy;
+            new_point.z = z;
+            dense_cloud->points.push_back(new_point);
+        }
+
+
+
+        last_point = point;
+    }
+    pcl::PointXYZ point = floorplan->points[0];
+    for (float i = 0.0; i <= 1; i+=0.001) {
+        float dx = last_point.x - point.x;
+        float dy = last_point.y - point.y;
+        pcl::PointXYZ new_point;
+        new_point.x = point.x + i * dx;
+        new_point.y = point.y + i * dy;
+        new_point.z = z;
+        dense_cloud->points.push_back(new_point);
+    }
+
+}
+
 
 

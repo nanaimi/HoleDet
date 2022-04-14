@@ -13,7 +13,8 @@ int main (int argc, char** argv)
 
     HoleDetector holeDetector (path + "hololens.pcd",
                                path + "floorplan.jpg" );
-    holeDetector.detectHoles();
+
     holeDetector.getFloorplanCloud(true, path + "floorplan.pcd");
+    holeDetector.detectHoles();
     holeDetector.visualize();
 }

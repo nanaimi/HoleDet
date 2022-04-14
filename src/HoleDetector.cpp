@@ -18,6 +18,7 @@ HoleDetector::HoleDetector(const basic_string<char> &file_name, const std::basic
         hole_hull_cloud(new PointCloud<pcl::PointXYZ>),
         interior_boundaries(new PointCloud<PointXYZ>),
         floorplan_(new PointCloud<PointXYZ>),
+        dense_floorplan_(new PointCloud<PointXYZ>),
         viewer (new visualization::PCLVisualizer ("3D Viewer")),
         floor_coefficients (new ModelCoefficients)
 
@@ -28,6 +29,11 @@ HoleDetector::HoleDetector(const basic_string<char> &file_name, const std::basic
     tp_.cnt = 0;
     min_size = 0.2;
     boundary_search_radius = 0.6;
+
+    init_filters();
+    raw_cloud = Utils::readCloud(pointcloud_file_, reader);
+    pre_process();
+    Utils::extractAndProjectFloor(filtered_cloud, floor, floor_projected_, floor_coefficients);
 }
 
 void HoleDetector::init_filters() {
@@ -49,12 +55,9 @@ void HoleDetector::pre_process() {
 }
 
 void HoleDetector::detectHoles() {
-    init_filters();
-    raw_cloud = Utils::readCloud(pointcloud_file_, reader);
-    pre_process();
-    Utils::extractAndProjectFloor(filtered_cloud, floor, floor_projected_, floor_coefficients);
+    Utils::denseFloorplanCloud(floorplan_, dense_floorplan_, floor_projected_->points[0].z);
     Utils::createConcaveHull(floor_projected_, hull_cloud, hull_polygons, chull);
-    Utils::getInteriorBoundaries(floor_projected_, hull_cloud, interior_boundaries);
+    Utils::getInteriorBoundaries(floor_projected_, dense_floorplan_, interior_boundaries);
     calculate();
 
 }
@@ -85,6 +88,11 @@ void HoleDetector::visualize() {
     viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
                                               0.5f, 0.0f, 0.5f, "floorplan");
     viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2,"floorplan");
+
+    viewer ->addPointCloud(dense_floorplan_,"dense_floor");
+    viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
+                                              1.0f, 0.0f, 0.0f, "dense_floor");
+    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 5,"dense_floor");
 
     Utils::drawLinesInCloud(floorplan_, viewer);
 
