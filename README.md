@@ -26,11 +26,11 @@
 - [ ] construct and find loops using boundary points (matt)
 
 ### Implementaion
-- [ ] Clean up and get main up and running (Moe and Matt)
-- [ ] Integrate floor plan filtering (Matt)
-    - Walls, edges improve hole detection
+- [x] Clean up and get main up and running (Moe and Matt)
+- [x] Integrate floor plan filtering (Matt)
+- [ ] Walls, edges improve hole detection
 - [ ] Test robustness of floor plan filtering (Moe)
-- [ ] determine surfaces of holes (Matt)
+- [x] determine surfaces of holes (Matt)
 - [ ] Hole data structure (Moe)
     - Centroid
     - Point cloud of all boundary points
