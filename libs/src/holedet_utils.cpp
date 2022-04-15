@@ -334,5 +334,12 @@ void Utils::denseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &floorplan,
 
 }
 
+void Utils::combinePointClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr &source_cloud,
+                               pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud) {
+    for (auto point:source_cloud->points) {
+        cloud->points.push_back(point);
+    }
+}
+
 
 

@@ -57,6 +57,7 @@ void HoleDetector::pre_process() {
 void HoleDetector::detectHoles() {
     Utils::denseFloorplanCloud(floorplan_, dense_floorplan_, floor_projected_->points[0].z);
     Utils::createConcaveHull(floor_projected_, hull_cloud, hull_polygons, chull);
+    Utils::combinePointClouds(hull_cloud, dense_floorplan_);
     Utils::getInteriorBoundaries(floor_projected_, dense_floorplan_, interior_boundaries);
     calculate();
 
@@ -74,10 +75,6 @@ void HoleDetector::calculate() {
 }
 
 void HoleDetector::visualize() {
-    viewer->addPointCloud(hull_cloud,"hull");
-    viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
-                                              0.0f, 1.0f, 1.0f, "hull");
-    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2,"hull");
 
     viewer ->addPointCloud(floor,"floor");
     viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
@@ -92,15 +89,14 @@ void HoleDetector::visualize() {
     viewer ->addPointCloud(dense_floorplan_,"dense_floor");
     viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
                                               1.0f, 0.0f, 0.0f, "dense_floor");
-    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 5,"dense_floor");
+    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 1,"dense_floor");
 
-    Utils::drawLinesInCloud(floorplan_, viewer);
+//    Utils::drawLinesInCloud(floorplan_, viewer);
 
     for (int i = 0; i < holes.size(); ++i) {
         if (hole_areas[i] < min_size) { continue; }
         auto name = "hole_" + std::to_string(i);
         float r1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-        float r2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
         float r3 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
         viewer->addPointCloud(holes[i], name);
         viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_COLOR, r1, 1 - r1, r3, name);
