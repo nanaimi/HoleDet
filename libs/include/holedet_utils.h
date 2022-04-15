@@ -103,6 +103,16 @@ class Utils {
                                     const int max_iteration,
                                     const int max_angle,
                                     const int max_translation);
+    /// Takes the vertices of the floorplan as input and creates a dense pointcloud with points along the walls of the map
+    /// \param floorplan The cloud containing the vertex points of the floorplan
+    /// \param dense_cloud The cloud where a dense set of points are added along the walls
+    /// \param z The height of the floor in the HoloLens coordinate frame
+    static void denseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr& floorplan, pcl::PointCloud<pcl::PointXYZ>::Ptr& dense_cloud, const float z);
+
+    /// Adds all the points from the source_cloud to cloud.
+    /// \param source_cloud
+    /// \param cloud
+    static void combinePointClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr& source_cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud);
 };
 #endif //HOLEDET_HOLEDET_UTILS_H
 

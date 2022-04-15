@@ -18,6 +18,7 @@ HoleDetector::HoleDetector(const basic_string<char> &file_name, const std::basic
         hole_hull_cloud(new PointCloud<pcl::PointXYZ>),
         interior_boundaries(new PointCloud<PointXYZ>),
         floorplan_(new PointCloud<PointXYZ>),
+        dense_floorplan_(new PointCloud<PointXYZ>),
         viewer (new visualization::PCLVisualizer ("3D Viewer")),
         floor_coefficients (new ModelCoefficients)
 
@@ -28,6 +29,11 @@ HoleDetector::HoleDetector(const basic_string<char> &file_name, const std::basic
     tp_.cnt = 0;
     min_size = 0.2;
     boundary_search_radius = 0.6;
+
+    init_filters();
+    raw_cloud = Utils::readCloud(pointcloud_file_, reader);
+    pre_process();
+    Utils::extractAndProjectFloor(filtered_cloud, floor, floor_projected_, floor_coefficients);
 }
 
 void HoleDetector::init_filters() {
@@ -49,12 +55,10 @@ void HoleDetector::pre_process() {
 }
 
 void HoleDetector::detectHoles() {
-    init_filters();
-    raw_cloud = Utils::readCloud(pointcloud_file_, reader);
-    pre_process();
-    Utils::extractAndProjectFloor(filtered_cloud, floor, floor_projected_, floor_coefficients);
+    Utils::denseFloorplanCloud(floorplan_, dense_floorplan_, floor_projected_->points[0].z);
     Utils::createConcaveHull(floor_projected_, hull_cloud, hull_polygons, chull);
-    Utils::getInteriorBoundaries(floor_projected_, hull_cloud, interior_boundaries);
+    Utils::combinePointClouds(hull_cloud, dense_floorplan_);
+    Utils::getInteriorBoundaries(floor_projected_, dense_floorplan_, interior_boundaries);
     calculate();
 
 }
@@ -71,10 +75,6 @@ void HoleDetector::calculate() {
 }
 
 void HoleDetector::visualize() {
-    viewer->addPointCloud(hull_cloud,"hull");
-    viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
-                                              0.0f, 1.0f, 1.0f, "hull");
-    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2,"hull");
 
     viewer ->addPointCloud(floor,"floor");
     viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
@@ -86,13 +86,17 @@ void HoleDetector::visualize() {
                                               0.5f, 0.0f, 0.5f, "floorplan");
     viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2,"floorplan");
 
-    Utils::drawLinesInCloud(floorplan_, viewer);
+    viewer ->addPointCloud(dense_floorplan_,"dense_floor");
+    viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
+                                              1.0f, 0.0f, 0.0f, "dense_floor");
+    viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 1,"dense_floor");
+
+//    Utils::drawLinesInCloud(floorplan_, viewer);
 
     for (int i = 0; i < holes.size(); ++i) {
         if (hole_areas[i] < min_size) { continue; }
         auto name = "hole_" + std::to_string(i);
         float r1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-        float r2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
         float r3 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
         viewer->addPointCloud(holes[i], name);
         viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_COLOR, r1, 1 - r1, r3, name);

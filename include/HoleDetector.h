@@ -59,6 +59,8 @@ private:
     pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries;
     PointCloud<PointXYZ>::Ptr floor_projected_;
     PointCloud<PointXYZ>::Ptr floorplan_;
+    PointCloud<PointXYZ>::Ptr dense_floorplan_;
+
 
     pcl::ModelCoefficients::Ptr floor_coefficients;
     std::vector<pcl::Vertices> hull_polygons;
