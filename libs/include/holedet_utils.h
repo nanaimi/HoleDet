@@ -34,6 +34,8 @@
 #include <pcl/surface/convex_hull.h>
 #include <pcl/surface/gp3.h>
 #include <pcl/ml/kmeans.h>
+#include <pcl/features/normal_3d_omp.h>
+#include <pcl/surface/poisson.h>
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/types.hpp>
@@ -113,6 +115,11 @@ class Utils {
     /// \param source_cloud
     /// \param cloud
     static void combinePointClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr& source_cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud);
+
+    /// Creates mesh using poisson reconstruction
+    /// \param cloud
+    /// \param mesh
+    static void constructMesh(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PolygonMesh & mesh, const double normal_search_radius, const int poisson_depth);
 };
 #endif //HOLEDET_HOLEDET_UTILS_H
 

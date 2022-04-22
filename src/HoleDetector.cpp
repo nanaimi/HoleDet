@@ -9,7 +9,7 @@ using namespace Eigen;
 using namespace std;
 using namespace std::chrono_literals;
 
-HoleDetector::HoleDetector(const basic_string<char> &file_name, const std::basic_string<char> &floorplan_path):
+HoleDetector::HoleDetector(const basic_string<char> &path, const basic_string<char> &config_filename):
         raw_cloud(new PointCloud<PointXYZ>),
         filtered_cloud(new PointCloud<PointXYZ>),
         floor(new PointCloud<PointXYZ>),
@@ -21,10 +21,10 @@ HoleDetector::HoleDetector(const basic_string<char> &file_name, const std::basic
         dense_floorplan_(new PointCloud<PointXYZ>),
         viewer (new visualization::PCLVisualizer ("3D Viewer")),
         floor_coefficients (new ModelCoefficients)
-
 {
-    pointcloud_file_ = file_name;
-    floorplan_file_ = floorplan_path;
+    path_ = path;
+    config_file_ = config_filename;
+    ReadYAML();
     min_size = 50;
     tp_.cnt = 0;
     min_size = 0.2;
@@ -34,6 +34,36 @@ HoleDetector::HoleDetector(const basic_string<char> &file_name, const std::basic
     raw_cloud = Utils::readCloud(pointcloud_file_, reader);
     pre_process();
     Utils::extractAndProjectFloor(filtered_cloud, floor, floor_projected_, floor_coefficients);
+}
+
+void HoleDetector::ReadYAML() {
+    try {
+        YAML::Node config = YAML::LoadFile(config_file_);
+        debug_ = config["debug"].as<bool>();
+        std::cout << "loading" << std::endl;
+        pointcloud_file_ = path_ + config["input"]["cloud_file"].as<std::string>();
+        trajectory_file_ = path_ + config["input"]["trajectory_file"].as<std::string>();
+        floorplan_file_ = path_ + config["input"]["floorplan_file"].as<std::string>();
+
+        kPoissonDepth_ = config["parameters"]["poisson_depth"].as<int>();
+        kNormalSearchRadius_ = config["parameters"]["normal_search_radius"].as<double>();
+
+        kOutlierRadius_ = config["parameters"]["outlier_radius"].as<double>();
+        kMinNeighbours_ = config["parameters"]["outlier_min_neighbours"].as<int>();
+
+        kImgResolution_ = config["parameters"]["image_resolution"].as<double>();
+        kMaxIteration_ = config["parameters"]["max_iteration"].as<int>();
+        kMaxTranslation_ = config["parameters"]["max_translation"].as<int>();
+        kMaxAngle_ = config["parameters"]["max_angle"].as<int>(); // [deg]
+
+        kPassXLimMin_ = config["parameters"]["pass_xlim_min"].as<double>();
+        kPassXLimMax_ = config["parameters"]["pass_xlim_max"].as<double>();
+        kPassYLimMin_ = config["parameters"]["pass_ylim_min"].as<double>();
+        kPassYLimMax_ = config["parameters"]["pass_ylim_max"].as<double>();
+
+    } catch(const YAML::ParserException& ex) {
+        std::cout << ex.what() << std::endl;
+    }
 }
 
 void HoleDetector::init_filters() {

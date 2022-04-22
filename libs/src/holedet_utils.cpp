@@ -3,6 +3,7 @@
 //
 
 #include "holedet_utils.h"
+
 pcl::PointCloud<pcl::PointXYZ>::Ptr Utils::readCloud(const std::basic_string<char> &file_name, pcl::PCDReader &reader) {
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
     reader.read(file_name, *cloud);
@@ -317,8 +318,6 @@ void Utils::denseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &floorplan,
             dense_cloud->points.push_back(new_point);
         }
 
-
-
         last_point = point;
     }
     pcl::PointXYZ point = floorplan->points[0];
@@ -344,6 +343,42 @@ void Utils::combinePointClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr &source_cloud
     for (auto point:source_cloud->points) {
         cloud->points.push_back(point);
     }
+}
+
+void Utils::constructMesh(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+                          pcl::PolygonMesh & mesh,
+                          const double normal_search_radius,
+                          const int poisson_depth) {
+    /* normal estimation using OMP */
+    Eigen::Vector4f centroid;
+    pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>());
+    pcl::NormalEstimationOMP<pcl::PointXYZ, pcl::Normal> normal_estimate;
+    normal_estimate.setNumberOfThreads(8);
+    normal_estimate.setInputCloud(cloud);
+    normal_estimate.setRadiusSearch(normal_search_radius);
+    pcl::compute3DCentroid(*cloud, centroid);
+    normal_estimate.setViewPoint(centroid[0], centroid[1], centroid[2]);
+    normal_estimate.compute(*cloud_normals);
+
+    // reverse normals' direction
+//    #pragma omp parallel for
+    for(size_t i = 0; i < cloud_normals->size(); ++i){
+        cloud_normals->points[i].normal_x *= -1;
+        cloud_normals->points[i].normal_y *= -1;
+        cloud_normals->points[i].normal_z *= -1;
+    }
+    /* End normal estimation */
+
+    // combine points and normals
+    pcl::PointCloud<pcl::PointNormal>::Ptr cloud_smoothed_normals(new pcl::PointCloud<pcl::PointNormal>());
+    concatenateFields(*cloud, *cloud_normals, *cloud_smoothed_normals);
+
+    /* poisson reconstruction */
+    pcl::Poisson<pcl::PointNormal> poisson;
+    poisson.setDepth(poisson_depth);
+    poisson.setInputCloud(cloud_smoothed_normals);
+    poisson.reconstruct(mesh);
+    /* end poisson reconstruction */
 }
 
 

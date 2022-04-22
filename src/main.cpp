@@ -7,14 +7,13 @@ namespace fs = boost::filesystem;
 int main (int argc, char** argv)
 {
 
-    std::string data_path = "/../data/";
-    fs::path current = fs::current_path();
-    auto path = current.string() + data_path;
+    fs::path path = fs::current_path();
+    auto config_path = path.string() + "/cfg/";
+    auto data_path = path.string() + "/data/talstrasse/";
 
-    HoleDetector holeDetector (path + "hololens.pcd",
-                               path + "floorplan.jpg" );
+    HoleDetector holeDetector (path.string(), config_path + "config.yaml");
 
-    holeDetector.getFloorplanCloud(true, path + "floorplan.pcd");
+    holeDetector.getFloorplanCloud(true, data_path + "Floorplan/floorplan.pcd");
     holeDetector.detectHoles();
     holeDetector.visualize();
 }
