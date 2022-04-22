@@ -271,21 +271,31 @@ void Utils::TransformPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud
 }
 
 void Utils::CalcAreaScore(std::vector<Hole> &holes, pcl::ConvexHull<pcl::PointXYZ> cvxhull) {
-    // double area;
-    // pcl::PointCloud<pcl::PointXYZ>::Ptr convex_hull_reconstruct (new pcl::PointCloud<pcl::PointXYZ>);
-
+    pcl::PointCloud<pcl::PointXYZ>::Ptr convex_hull_reconstruct (new pcl::PointCloud<pcl::PointXYZ>);
+    std::vector<float> areas;
+    float max_area = 0;
     for (auto& hole : holes) {
-        if(hole.points->size() < 3){
-            hole.score -= 2;
+        if (hole.points->size() < 3) {
+            hole.score = 0;
+            areas.push_back(0.0);
         }
-        // TODO Define what to do with area score
-        /*else {
+            // TODO Define what to do with area score
+        else {
             cvxhull.setComputeAreaVolume(true);
             cvxhull.setInputCloud(hole.points);
             cvxhull.reconstruct(*convex_hull_reconstruct);
-
-            area = cvxhull.getTotalArea();
-        } */
+            float area = cvxhull.getTotalArea();
+            areas.push_back(area);
+            if (area > max_area) {
+                max_area = area;
+            }
+        }
+    }
+    for(int i = 0; i < holes.size(); i++) {
+        if(holes[i].score == 0) {
+            continue;
+        }
+        holes[i].score -= (1 - areas[i] / max_area);
     }
 }
 
