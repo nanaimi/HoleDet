@@ -1,0 +1,19 @@
+---
+debug: false
+input:
+  cloud_file: /data/talstrasse/hololens.pcd
+  trajectory_file: /data/talstrasse/trajectories/gaze_directions.obj
+  floorplan_file: /data/talstrasse/Floorplan/floorplan.jpg
+parameters:
+  poisson_depth: 6
+  normal_search_radius: 0.5
+  outlier_radius: 3
+  outlier_min_neighbours: 10
+  image_resolution: 0.0694
+  max_iteration: 10000
+  max_translation: 5
+  max_angle: 10
+  pass_xlim_min: -13.0
+  pass_xlim_max: 24.0
+  pass_ylim_min: -15.0
+  pass_ylim_max: 25.0

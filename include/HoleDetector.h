@@ -6,6 +6,7 @@
 #define HOLEDET_HOLEDETECTOR_H
 
 #include "holedet_utils.h"
+#include "yaml-cpp/yaml.h"
 
 using namespace pcl;
 using namespace Eigen;
@@ -23,7 +24,7 @@ struct TransformPoints {
 
 class HoleDetector {
 public:
-    HoleDetector(const std::basic_string<char> &file_name, const std::basic_string<char> &floorplan_path);
+    HoleDetector(const basic_string<char> &path, const basic_string<char> &config_filename);
 
     void detectHoles();
     void getFloorplanCloud(bool debug, string floorplan_path);
@@ -32,14 +33,30 @@ public:
 
 private:
     // constants TODO Move to yaml file
-    const float kImgResolution_ = 0.0694; // [m/px]
-    const int kMaxIteration_ = 10000;
-    const int kMaxTranslation_ = 5;
-    const int kMaxAngle_ = 10; // [deg]
-
+    basic_string<char> path_;
+    basic_string<char> config_file_;
     basic_string<char> pointcloud_file_;
+    basic_string<char> trajectory_file_;
     basic_string<char> floorplan_file_;
     PCDReader reader;
+
+    bool debug_;
+
+    int kPoissonDepth_;
+    float kNormalSearchRadius_;
+
+    double kOutlierRadius_;
+    int kMinNeighbours_;
+
+    double kPassXLimMin_;
+    double kPassXLimMax_;
+    double kPassYLimMin_;
+    double kPassYLimMax_;
+
+    double kImgResolution_; // [m/px]
+    int kMaxIteration_;
+    int kMaxTranslation_;
+    int kMaxAngle_; // [deg]
 
     // Point Picking
     MouseParams mp_;
@@ -48,7 +65,6 @@ private:
     // Filters
     RadiusOutlierRemoval<PointXYZ> outrem;
     VoxelGrid<PointXYZ> voxel_filter;
-
 
     // Clouds
     pcl::PointCloud<pcl::PointXYZ>::Ptr raw_cloud;
@@ -80,7 +96,7 @@ private:
     float boundary_search_radius;
 
 
-
+    void ReadYAML();
     void init_filters();
     void pre_process();
     void calculate();
