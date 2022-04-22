@@ -1,9 +1,9 @@
 ---
 debug: false
 input:
-  cloud_file: /data/talstrasse/hololens.pcd
+  cloud_file: /data/hololens.pcd
   trajectory_file: /data/talstrasse/trajectories/gaze_directions.obj
-  floorplan_file: /data/talstrasse/Floorplan/floorplan.jpg
+  floorplan_file: /data/floorplan.jpg
 parameters:
   poisson_depth: 6
   normal_search_radius: 0.5
@@ -17,3 +17,4 @@ parameters:
   pass_xlim_max: 24.0
   pass_ylim_min: -15.0
   pass_ylim_max: 25.0
+  start_score: 5.0

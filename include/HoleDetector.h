@@ -26,13 +26,14 @@ class HoleDetector {
 public:
     HoleDetector(const basic_string<char> &path, const basic_string<char> &config_filename);
 
-    void detectHoles();
-    void getFloorplanCloud(bool debug, string floorplan_path);
-    void visualize();
-    void setBoundarySearchRadius(const float value);
+    void DetectHoles();
+    void GetFloorplanCloud(bool debug, string floorplan_path);
+    void CalculateScores();
+    void Visualize();
+    void SetBoundarySearchRadius(const float value);
 
 private:
-    // constants TODO Move to yaml file
+    // constants
     basic_string<char> path_;
     basic_string<char> config_file_;
     basic_string<char> pointcloud_file_;
@@ -41,6 +42,8 @@ private:
     PCDReader reader;
 
     bool debug_;
+
+    float kStartScore_;
 
     int kPoissonDepth_;
     float kNormalSearchRadius_;
@@ -58,53 +61,56 @@ private:
     int kMaxTranslation_;
     int kMaxAngle_; // [deg]
 
+    // vector of holes
+    vector<Hole> holes_;
+
     // Point Picking
     MouseParams mp_;
     TransformPoints tp_;
 
     // Filters
-    RadiusOutlierRemoval<PointXYZ> outrem;
-    VoxelGrid<PointXYZ> voxel_filter;
+    RadiusOutlierRemoval<PointXYZ> outrem_;
+    VoxelGrid<PointXYZ> voxel_filter_;
 
     // Clouds
-    pcl::PointCloud<pcl::PointXYZ>::Ptr raw_cloud;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr floor;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr hole_hull_cloud;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr raw_cloud_;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud_;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr floor_;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud_;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr hole_hull_cloud_;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries_;
     PointCloud<PointXYZ>::Ptr floor_projected_;
     PointCloud<PointXYZ>::Ptr floorplan_;
     PointCloud<PointXYZ>::Ptr dense_floorplan_;
 
 
-    pcl::ModelCoefficients::Ptr floor_coefficients;
-    std::vector<pcl::Vertices> hull_polygons;
-    pcl::ConcaveHull<pcl::PointXYZ> chull;
-    pcl::ConvexHull<pcl::PointXYZ> cvxhull;
+    pcl::ModelCoefficients::Ptr floor_coefficients_;
+    std::vector<pcl::Vertices> hull_polygons_;
+    pcl::ConcaveHull<pcl::PointXYZ> chull_;
+    pcl::ConvexHull<pcl::PointXYZ> cvxhull_;
 
     // Holes
-    std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> holes;
-    std::vector<int> hole_sizes;
-    std::vector<pcl::PointXYZ> centers;
-    std::vector<double> hole_areas;
+    //std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> holes;
+    //std::vector<int> hole_sizes;
+   // std::vector<pcl::PointXYZ> centers;
+    //std::vector<double> hole_areas;
     // Visualizer
-    visualization::PCLVisualizer::Ptr viewer;
+    visualization::PCLVisualizer::Ptr viewer_;
 
     // Tuning Parameters
-    double min_size;
-    float boundary_search_radius;
+    double min_score_;
+    float boundary_search_radius_;
 
 
     void ReadYAML();
-    void init_filters();
-    void pre_process();
-    void calculate();
+    void InitFilters();
+    void PreProcess();
+    void CalculateCentroids();
 
-    void keyboardEventOccurred (const visualization::KeyboardEvent &event, void* viewer_void);
-    static void pp_callback(const visualization::PointPickingEvent& event, void* viewer_void);
-    static void point_picker_cb(const visualization::PointPickingEvent& event, void* param);
-    static void onMouse(int event, int x, int y, int flags, void* param);
+    void KeyboardEventOccurred (const visualization::KeyboardEvent &event, void* viewer_void);
+    static void PpCallback(const visualization::PointPickingEvent& event, void* viewer_void);
+    static void PointPickerCb(const visualization::PointPickingEvent& event, void* param);
+    static void OnMouse(int event, int x, int y, int flags, void* param);
 
 };
 

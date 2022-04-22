@@ -27,9 +27,9 @@
 
 ### Implementaion
 - [x] Clean up and get main up and running (Moe and Matt)
-- [x] Integrate floor plan filtering (Matt)
+- [x] Integrate floor_ plan filtering (Matt)
 - [ ] Walls, edges improve hole detection
-- [ ] Test robustness of floor plan filtering (Moe)
+- [ ] Test robustness of floor_ plan filtering (Moe)
 - [x] determine surfaces of holes (Matt)
 - [ ] Hole data structure (Moe)
     - Centroid

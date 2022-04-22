@@ -4,13 +4,13 @@
 
 #include "holedet_utils.h"
 
-pcl::PointCloud<pcl::PointXYZ>::Ptr Utils::readCloud(const std::basic_string<char> &file_name, pcl::PCDReader &reader) {
+pcl::PointCloud<pcl::PointXYZ>::Ptr Utils::ReadCloud(const std::basic_string<char> &file_name, pcl::PCDReader &reader) {
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
     reader.read(file_name, *cloud);
     return cloud;
 }
 
-void Utils::extractAndProjectFloor(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+void Utils::ExtractAndProjectFloor(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
                                               pcl::PointCloud<pcl::PointXYZ>::Ptr floor,
                                               pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected,
                                               pcl::ModelCoefficients::Ptr coefficients) {
@@ -25,12 +25,12 @@ void Utils::extractAndProjectFloor(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
     seg.setDistanceThreshold(0.1);
     seg.setMaxIterations(10000);
 
-    // segment floor
+    // segment floor_
     seg.setInputCloud(cloud);
     seg.segment(*inliers, *coefficients);
     pcl::copyPointCloud<pcl::PointXYZ>(*cloud, *inliers, *floor);
 
-    // extract floor from input cloud
+    // extract floor_ from input cloud
     pcl::ExtractIndices<pcl::PointXYZ> extract;
     extract.setInputCloud(cloud);
     extract.setIndices(inliers);
@@ -46,7 +46,7 @@ void Utils::extractAndProjectFloor(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
 
 }
 
-void Utils::createConcaveHull(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud,
+void Utils::CreateConcaveHull(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud,
                                          pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud,
                                          std::vector<pcl::Vertices> polygons,
                                          pcl::ConcaveHull<pcl::PointXYZ> chull) {
@@ -55,7 +55,7 @@ void Utils::createConcaveHull(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud,
     chull.reconstruct(*hull_cloud, polygons);
 }
 
-void Utils::getInteriorBoundaries(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud,
+void Utils::GetInteriorBoundaries(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud,
                                              pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud,
                                              pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries) {
     pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>);
@@ -98,9 +98,8 @@ void Utils::getInteriorBoundaries(pcl::PointCloud<pcl::PointXYZ>::Ptr input_clou
     }
 }
 
-void Utils::getHoleClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries, const float n_search_radius,
-                                     std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes,
-                                     std::vector<int> &hole_sizes) {
+void Utils::GetHoleClouds(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries,
+                          const float n_search_radius) {
     pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
     kdtree.setInputCloud(interior_boundaries);
 
@@ -111,13 +110,14 @@ void Utils::getHoleClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundarie
         int start_point = i;
         if (std::count(visited.begin(), visited.end(), i)) { continue; }
 
+        Hole hole;
         pcl::PointXYZ search_point = interior_boundaries->points[start_point];
         std::vector<int> pointIdxRadiusSearch;
         std::vector<float> pointRadiusSquaredDistance;
 
         visited.push_back(start_point);
-        pcl::PointCloud<pcl::PointXYZ>::Ptr hole(new pcl::PointCloud<pcl::PointXYZ>);
-        hole->push_back(interior_boundaries->points[start_point]);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr hole_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        hole_cloud->push_back(interior_boundaries->points[start_point]);
 
         std::deque<int> to_visit;
         do {
@@ -134,34 +134,27 @@ void Utils::getHoleClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundarie
             point_idx = to_visit.front();
             to_visit.pop_front();
             if (point_idx < interior_boundaries->points.size() && point_idx > 0) {
-                hole->push_back(interior_boundaries->points[point_idx]);
+                hole_cloud->push_back(interior_boundaries->points[point_idx]);
                 search_point = interior_boundaries->points[point_idx];
                 visited.push_back(point_idx);
             } else { break; }
 
         } while (!to_visit.empty());
+        hole.points = hole_cloud;
+        hole.size = hole_cloud->points.size();
         holes.push_back(hole);
     }
-
-    for (auto hole: holes) {
-        hole_sizes.push_back(hole->points.size());
-    }
-
 }
 
-void Utils::calcHoleCenters(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes,
-                                       const int &min_size, std::vector<pcl::PointXYZ> &centers) {
-    for (int i = 0; i < holes.size(); ++i) {
-
+void Utils::CalcHoleCenters(std::vector<Hole> &holes) {
+    for (auto& hole : holes) {
         Eigen::Matrix<float, 4, 1> hole_center;
-        pcl::compute3DCentroid(*holes[i], hole_center);
-        pcl::PointXYZ center(hole_center.x(), hole_center.y(), hole_center.z());
-
-        centers.push_back(center);
+        pcl::compute3DCentroid(*hole.points, hole_center);
+        hole.centroid = pcl::PointXYZ(hole_center.x(), hole_center.y(), hole_center.z());
     }
 }
 
-void Utils::createPointCloudFromImgPts(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
+void Utils::CreatePointCloudFromImgPts(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
                                        std::vector<cv::Point> img_pts,
                                        const float img_resolution) {
     pcl::PointXYZ last_pt (0, 0, 0);
@@ -176,7 +169,7 @@ void Utils::createPointCloudFromImgPts(const pcl::PointCloud<pcl::PointXYZ>::Ptr
     }
 }
 
-void Utils::drawLinesInCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
+void Utils::DrawLinesInCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
                                  const pcl::visualization::PCLVisualizer::Ptr viewer) {
     bool first = true;
     int cnt =  0;
@@ -193,7 +186,7 @@ void Utils::drawLinesInCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
     viewer->addLine(cloud->points[0], last_point, 1.0, 0.0, 0.0, "line" + std::to_string(cnt));
 }
 
-void Utils::transformPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_in,
+void Utils::TransformPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_in,
                                 const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
                                 std::vector<Eigen::Vector3f> points,
                                 const int max_iteration,
@@ -213,7 +206,7 @@ void Utils::transformPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud
     Eigen::Affine3f t(trans);
     pcl::transformPointCloud(*cloud_in, *cloud_out, t, false);
 
-    // Project the floor and the floorplan to create a true 2d problem z = 0
+    // Project the floor_ and the floorplan to create a true 2d problem z = 0
     pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
     coefficients->values.resize (4);
     coefficients->values[0] = 0;
@@ -277,27 +270,26 @@ void Utils::transformPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud
     pcl::transformPointCloud(*cloud_out, *cloud_in, best_transform);
 }
 
-void Utils::calcHoleAreas(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes,
-                          std::vector<double> &hole_areas, pcl::ConvexHull<pcl::PointXYZ> cvxhull, pcl::PointCloud<pcl::PointXYZ>::Ptr hole_hull_cloud) {
-    double area;
-    for (int i = 0; i < holes.size(); ++i) {
-        if(holes[i]->size() < 3){
-            area = 0;
+void Utils::CalcAreaScore(std::vector<Hole> &holes, pcl::ConvexHull<pcl::PointXYZ> cvxhull) {
+    // double area;
+    // pcl::PointCloud<pcl::PointXYZ>::Ptr convex_hull_reconstruct (new pcl::PointCloud<pcl::PointXYZ>);
+
+    for (auto& hole : holes) {
+        if(hole.points->size() < 3){
+            hole.score -= 2;
         }
-        else {
+        // TODO Define what to do with area score
+        /*else {
             cvxhull.setComputeAreaVolume(true);
-            cvxhull.setInputCloud(holes[i]);
-            cvxhull.reconstruct(*hole_hull_cloud);
+            cvxhull.setInputCloud(hole.points);
+            cvxhull.reconstruct(*convex_hull_reconstruct);
 
             area = cvxhull.getTotalArea();
-        }
-
-        hole_areas.push_back(area);
+        } */
     }
-
 }
 
-void Utils::denseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &floorplan,
+void Utils::DenseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &floorplan,
                                   pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud, pcl::ModelCoefficients::Ptr coefficients) {
     bool first = true;
     pcl::PointXYZ last_point = floorplan->points[0];
@@ -338,14 +330,14 @@ void Utils::denseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &floorplan,
 
 }
 
-void Utils::combinePointClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr &source_cloud,
+void Utils::CombinePointClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr &source_cloud,
                                pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud) {
     for (auto point:source_cloud->points) {
         cloud->points.push_back(point);
     }
 }
 
-void Utils::constructMesh(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+void Utils::ConstructMesh(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
                           pcl::PolygonMesh & mesh,
                           const double normal_search_radius,
                           const int poisson_depth) {

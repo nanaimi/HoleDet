@@ -13,7 +13,8 @@ int main (int argc, char** argv)
 
     HoleDetector holeDetector (path.string() + "/../", config_path + "config.yaml");
 
-    holeDetector.getFloorplanCloud(true, data_path + "floorplan.pcd");
-    holeDetector.detectHoles();
-    holeDetector.visualize();
+    holeDetector.GetFloorplanCloud(true, data_path + "floorplan.pcd");
+    holeDetector.DetectHoles();
+    holeDetector.CalculateScores();
+    holeDetector.Visualize();
 }
