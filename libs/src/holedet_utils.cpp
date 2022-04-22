@@ -298,7 +298,7 @@ void Utils::calcHoleAreas(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &hole
 }
 
 void Utils::denseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &floorplan,
-                                  pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud, const float z) {
+                                  pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud, pcl::ModelCoefficients::Ptr coefficients) {
     bool first = true;
     pcl::PointXYZ last_point = floorplan->points[0];
     for (auto point : *floorplan) {
@@ -314,7 +314,7 @@ void Utils::denseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &floorplan,
             pcl::PointXYZ new_point;
             new_point.x = point.x + i * dx;
             new_point.y = point.y + i * dy;
-            new_point.z = z;
+            new_point.z = point.z;
             dense_cloud->points.push_back(new_point);
         }
 
@@ -327,9 +327,14 @@ void Utils::denseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &floorplan,
         pcl::PointXYZ new_point;
         new_point.x = point.x + i * dx;
         new_point.y = point.y + i * dy;
-        new_point.z = z;
+        new_point.z = point.z;
         dense_cloud->points.push_back(new_point);
     }
+    pcl::ProjectInliers<pcl::PointXYZ> proj;
+    proj.setModelType(pcl::SACMODEL_PLANE);
+    proj.setInputCloud(dense_cloud);
+    proj.setModelCoefficients(coefficients);
+    proj.filter(*dense_cloud);
 
 }
 
