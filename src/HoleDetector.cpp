@@ -55,7 +55,7 @@ void HoleDetector::pre_process() {
 }
 
 void HoleDetector::detectHoles() {
-    Utils::denseFloorplanCloud(floorplan_, dense_floorplan_, floor_projected_->points[0].z);
+    Utils::denseFloorplanCloud(floorplan_, dense_floorplan_, floor_coefficients);
     Utils::createConcaveHull(floor_projected_, hull_cloud, hull_polygons, chull);
     Utils::combinePointClouds(hull_cloud, dense_floorplan_);
     Utils::getInteriorBoundaries(floor_projected_, dense_floorplan_, interior_boundaries);

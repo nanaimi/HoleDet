@@ -107,7 +107,7 @@ class Utils {
     /// \param floorplan The cloud containing the vertex points of the floorplan
     /// \param dense_cloud The cloud where a dense set of points are added along the walls
     /// \param z The height of the floor in the HoloLens coordinate frame
-    static void denseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr& floorplan, pcl::PointCloud<pcl::PointXYZ>::Ptr& dense_cloud, const float z);
+    static void denseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr& floorplan, pcl::PointCloud<pcl::PointXYZ>::Ptr& dense_cloud, pcl::ModelCoefficients::Ptr coefficients);
 
     /// Adds all the points from the source_cloud to cloud.
     /// \param source_cloud
