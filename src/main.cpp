@@ -8,12 +8,12 @@ int main (int argc, char** argv)
 {
 
     fs::path path = fs::current_path();
-    auto config_path = path.string() + "/cfg/";
-    auto data_path = path.string() + "/data/talstrasse/";
+    auto config_path = path.string() + "/../cfg/";
+    auto data_path = path.string() + "/../data/";
 
-    HoleDetector holeDetector (path.string(), config_path + "config.yaml");
+    HoleDetector holeDetector (path.string() + "/../", config_path + "config.yaml");
 
-    holeDetector.getFloorplanCloud(true, data_path + "Floorplan/floorplan.pcd");
+    holeDetector.getFloorplanCloud(true, data_path + "floorplan.pcd");
     holeDetector.detectHoles();
     holeDetector.visualize();
 }
