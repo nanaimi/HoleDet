@@ -43,6 +43,9 @@
 - [ ] 2D headings
 - [ ] Write a ReadMe
 - [x] Presentation for 25th of April
+- [ ] Refine clustering (Matt)
+- [ ] Mesh Approach for score (Nasib)
+- [ ] trajectory approach for score (Moe)
 
 
 ###
@@ -51,6 +54,7 @@
 - [x] Goal 3: Implemented holes (TBD)
 - [ ] Goal 4: position approach defined (TBD)
 - [ ] Goal 5: implemented position approach (TBD)
+- [ ] Goal 6: Everything works (18.5.)
 
 ### nice to haves
 - [ ] test edge detection in 3d point clouds (nasib)
