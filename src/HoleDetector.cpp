@@ -27,12 +27,12 @@ HoleDetector::HoleDetector(const basic_string<char> &path, const basic_string<ch
     ReadYAML();
     min_score_ = 4;
     tp_.cnt = 0;
-    boundary_search_radius_ = 0.6;
 
     InitFilters();
     raw_cloud_ = Utils::ReadCloud(pointcloud_file_, reader);
     PreProcess();
-    Utils::ExtractAndProjectFloor(filtered_cloud_, floor_, floor_projected_, floor_coefficients_);
+    Utils::ExtractAndProjectFloor(filtered_cloud_, floor_, floor_projected_,
+                                        floor_coefficients_);
 }
 
 void HoleDetector::ReadYAML() {
@@ -61,6 +61,8 @@ void HoleDetector::ReadYAML() {
         kPassYLimMin_ = config["parameters"]["pass_ylim_min"].as<double>();
         kPassYLimMax_ = config["parameters"]["pass_ylim_max"].as<double>();
 
+        boundary_search_radius_ = config["parameters"]["boundary_search_radius"].as<float>();
+
     } catch(const YAML::ParserException& ex) {
         std::cout << ex.what() << std::endl;
     }
@@ -79,8 +81,8 @@ void HoleDetector::PreProcess() {
     outrem_.setInputCloud(raw_cloud_);
     outrem_.filter (*filtered_cloud_);
 
-//    voxel_filter_.setInputCloud (filtered_cloud_);
-//    voxel_filter_.filter(*filtered_cloud_);
+    // voxel_filter_.setInputCloud (filtered_cloud_);
+    // voxel_filter_.filter(*filtered_cloud_);
 
 }
 
@@ -106,7 +108,11 @@ void HoleDetector::CalculateScores() {
     Utils::CalcAreaScore(holes_, cvxhull_);
     for(int i = 0; i < holes_.size(); i++) {
         float score = holes_[i].score;
-        cout << "Hole " << to_string(i) << ":\tScore :" << to_string(score) << "\n";
+        std::string str_nmb = to_string(i);
+        if(str_nmb.length() < 2) {
+            str_nmb = "0" + str_nmb;
+        }
+        cout << "Hole " << str_nmb << ":\tScore :" << to_string(score) << "\n";
     }
 }
 

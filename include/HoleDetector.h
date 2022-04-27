@@ -89,11 +89,6 @@ private:
     pcl::ConcaveHull<pcl::PointXYZ> chull_;
     pcl::ConvexHull<pcl::PointXYZ> cvxhull_;
 
-    // Holes
-    //std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> holes;
-    //std::vector<int> hole_sizes;
-   // std::vector<pcl::PointXYZ> centers;
-    //std::vector<double> hole_areas;
     // Visualizer
     visualization::PCLVisualizer::Ptr viewer_;
 

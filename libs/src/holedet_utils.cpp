@@ -279,7 +279,6 @@ void Utils::CalcAreaScore(std::vector<Hole> &holes, pcl::ConvexHull<pcl::PointXY
             hole.score = 0;
             areas.push_back(0.0);
         }
-            // TODO Define what to do with area score
         else {
             cvxhull.setComputeAreaVolume(true);
             cvxhull.setInputCloud(hole.points);
@@ -300,7 +299,8 @@ void Utils::CalcAreaScore(std::vector<Hole> &holes, pcl::ConvexHull<pcl::PointXY
 }
 
 void Utils::DenseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &floorplan,
-                                  pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud, pcl::ModelCoefficients::Ptr coefficients) {
+                                  pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud,
+                                  pcl::ModelCoefficients::Ptr coefficients) {
     bool first = true;
     pcl::PointXYZ last_point = floorplan->points[0];
     for (auto point : *floorplan) {
