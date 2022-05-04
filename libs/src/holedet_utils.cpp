@@ -160,6 +160,20 @@ void Utils::calcHoleCenters(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &ho
     }
 }
 
+void Utils::calcPoses(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes,
+                            std::vector<pcl::PointXYZ> &centers, std::vector<Eigen::Affine3f> &poses ) {
+    for (int i = 0; i < holes.size(); ++i) {
+        Eigen::Affine3f pose = Eigen::Affine3f::Identity();
+        Eigen::Vector3d vec(centers[i].x-holes[i]->points[0].x, centers[i].y-holes[i]->points[0].y, centers[i].z-holes[i]->points[0].z);
+
+        pose.translation() = Eigen::Vector3f(holes[i]->points[0].x,holes[i]->points[0].y,holes[i]->points[0].z);
+        pose.rotate(Eigen::AngleAxisf(atan2(vec(1),vec(0)), Eigen::Vector3f(0,0,1)));
+        pose.rotate(Eigen::AngleAxisf(atan2(vec(2),sqrt(vec(0)*vec(0)+vec(1)*vec(1))), Eigen::Vector3f(0,1,0)));
+
+        poses.push_back(pose);
+    }
+}
+
 void Utils::createPointCloudFromImgPts(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
                                        std::vector<cv::Point> img_pts,
                                        const float img_resolution) {

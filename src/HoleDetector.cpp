@@ -64,10 +64,11 @@ void HoleDetector::calculate() {
     centers.clear();
     hole_sizes.clear();
     holes.clear();
+    poses.clear();
     Utils::getHoleClouds(interior_boundaries, boundary_search_radius, holes, hole_sizes);
     Utils::calcHoleCenters(holes, min_size, centers);
     Utils::calcHoleAreas(holes, hole_areas, cvxhull, hole_hull_cloud);
-
+    Utils::calcPoses(holes, centers, poses);
 }
 
 void HoleDetector::visualize() {
@@ -101,6 +102,10 @@ void HoleDetector::visualize() {
         auto center_name = "hole_center_" + std::to_string(i);
         viewer->addSphere(centers[i],0.3,r1,1 - r1,r3, center_name);
 
+        //Handle poses visualisation
+        pcl::PointXYZ p(poses[i].translation().x(), poses[i].translation().y(), poses[i].translation().z());
+        viewer->addSphere(p,0.1,r1,1 - r1,r3, center_name + "_pose"); //add colour sphere to pose
+        viewer->addCoordinateSystem(0.5, poses[i]); //display pose
 
     }
 

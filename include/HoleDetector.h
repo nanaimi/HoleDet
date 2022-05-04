@@ -70,6 +70,7 @@ private:
     std::vector<int> hole_sizes;
     std::vector<pcl::PointXYZ> centers;
     std::vector<double> hole_areas;
+    std::vector<Eigen::Affine3f> poses;
     // Visualizer
     visualization::PCLVisualizer::Ptr viewer;
 
