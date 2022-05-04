@@ -7,7 +7,7 @@ find_package(OpenCV REQUIRED)
 
 add_definitions(${PCL_DEFINITIONS})
 
-add_library(Utils SHARED src/holedet_utils.cpp include/holedet_utils.h)
+add_library(Utils SHARED src/holedet_utils.cpp include/holedet_utils.h src/Normal2dEstimation.cpp include/Normal2dEstimation.h src/PCA2D.cpp include/PCA2D.h)
 
 target_include_directories(Utils PUBLIC ${OpenCV_INCLUDE_DIRS})
 target_include_directories(Utils PUBLIC ${PCL_INCLUDE_DIRS})
