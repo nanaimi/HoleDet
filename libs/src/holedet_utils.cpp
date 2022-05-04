@@ -122,11 +122,14 @@ void Utils::GetHoleClouds(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXY
         std::deque<int> to_visit;
         do {
             kdtree.radiusSearch(search_point, n_search_radius, pointIdxRadiusSearch, pointRadiusSquaredDistance);
-
+            // for all points within the search radius
             for (auto p: pointIdxRadiusSearch) {
+                // check if the point has already been visited and if it has already been added to the queue
                 if (!std::count(visited.begin(), visited.end(), p) &&
                     std::find(to_visit.begin(), to_visit.end(), p) == to_visit.end()) {
+                    // check if the point has a valid index
                     if (p < interior_boundaries->points.size() && p > 0) {
+                        // add point to queue
                         to_visit.push_back(p);
                     }
                 }
@@ -142,7 +145,9 @@ void Utils::GetHoleClouds(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXY
         } while (!to_visit.empty());
         hole.points = hole_cloud;
         hole.size = hole_cloud->points.size();
-        holes.push_back(hole);
+        if (hole.size>5) {
+            holes.push_back(hole);
+        }
     }
 }
 
