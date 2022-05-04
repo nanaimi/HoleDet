@@ -10,6 +10,50 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr Utils::ReadCloud(const std::basic_string<cha
     return cloud;
 }
 
+void Utils::ReadTrajectoriesAndGaze(const std::basic_string<char> &traj_file_name,
+                                    const std::basic_string<char> &gaze_file_name,
+                                    const std::basic_string<char> &lenghts_file_name,
+                                    pcl::PCDReader &reader,
+                                    std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& trajectories,
+                                    std::vector<std::vector<Eigen::Vector3f>>& gazes) {
+    pcl::PointCloud<pcl::PointXYZ>::Ptr trajectory = Utils::ReadCloud(traj_file_name, reader);
+
+    int max = 0;
+    int min = 0;
+    std::ifstream length_file(lenghts_file_name);
+    std::ifstream gaze_file(gaze_file_name);
+    std::string gaze;
+    std::string length;
+    std::vector<Eigen::Vector3f> all_gazes;
+
+    // decypher .obj file
+    while(std::getline(gaze_file, gaze)) {
+        if(gaze[0] == 'v') {
+            std::stringstream line(gaze.erase(0,2));
+            std::string segment;
+            std::vector<std::string> values;
+            while(std::getline(line, segment, ' ')) {
+                values.push_back(segment);
+            }
+            Eigen::Vector3f gaze_vec(stof(values[0]), stof(values[1]), stof(values[2]));
+            all_gazes.push_back(gaze_vec);
+        }
+    }
+
+    while(std::getline(length_file, length)) {
+        max += stoi(length);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr traj(new pcl::PointCloud<pcl::PointXYZ>);
+        std::vector<Eigen::Vector3f> curr_gazes;
+        for(int i = min; i < max; i++) {
+            traj->points.push_back(trajectory->points[i]);
+            curr_gazes.push_back(all_gazes[i]);
+        }
+        min = max;
+        trajectories.push_back(traj);
+        gazes.push_back(curr_gazes);
+    }
+}
+
 void Utils::ExtractAndProjectFloor(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
                                               pcl::PointCloud<pcl::PointXYZ>::Ptr floor,
                                               pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected,
@@ -184,6 +228,26 @@ void Utils::DrawLinesInCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
         cnt++;
     }
     viewer->addLine(cloud->points[0], last_point, 1.0, 0.0, 0.0, "line" + std::to_string(cnt));
+}
+
+void Utils::DrawGazesInCloud(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& trajectories,
+                             const std::vector<std::vector<Eigen::Vector3f>>& gazes,
+                             const pcl::visualization::PCLVisualizer::Ptr viewer) {
+    int n = trajectories.size();
+    for(int i = 0; i < n; i++) {
+        pcl::PointCloud<pcl::PointXYZ>::Ptr curr_traj = trajectories[i];
+        std::vector<Eigen::Vector3f> curr_gazes = gazes[i];
+        float r1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+        float r3 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+        std::string id_base = "arrow" + std::to_string(i);
+        for(int it = 0; it < curr_gazes.size(); it++) {
+            std::string id = id_base +  std::to_string(it);
+            std::cout << id << "\n";
+            pcl::PointXYZ p1 = curr_traj->points[it];
+            pcl::PointXYZ p2(p1.x + curr_gazes[it].x(), p1.y + curr_gazes[it].y(), p1.z + curr_gazes[it].z());
+            viewer->addArrow(p2, p1, r1, 1-r1, r3, false, id);
+        }
+    }
 }
 
 void Utils::TransformPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_in,
