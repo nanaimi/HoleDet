@@ -5,8 +5,8 @@
 
 ### setup etc
 - [x] datasets (stfm, ask asl? look online, matt asks, ask eric)
-- [ ] find more stfm pcl datasets (laurent)
-- [ ] setup repo structure
+- [x] find more stfm pcl datasets (laurent)
+- [x] setup repo structure
 - [x] install libraries (c++: pcl, python: open3d)
 - [x] google drive (laurent)
 - [x] laurent and mau zedong muessen lesen
@@ -19,38 +19,42 @@
 - [x] general data exploration (clustering, local statistics, etc.) (matt)
 - [ ] mesh approach (nasib)
 - [ ] height diff stuff (moe)
-- [ ] ask mapping guys asl (laurent)
+- [x] ask mapping guys asl (laurent)
 - [x] try different segmentation techniques (matt)
 - [x] read automated mav mapping paper, prototype approach (mau zedong)
 - [x] write email sorkine (igl lab) (nasib)
-- [ ] construct and find loops using boundary points (matt)
+- [x] construct and find loops using boundary points (matt)
 
 ### Implementaion
-- [ ] Clean up and get main up and running (Moe and Matt)
-- [ ] Integrate floor plan filtering (Matt)
-    - Walls, edges improve hole detection
-- [ ] Test robustness of floor plan filtering (Moe)
-- [ ] determine surfaces of holes (Matt)
-- [ ] Hole data structure (Moe)
+- [x] Clean up and get main up and running (Moe and Matt)
+- [x] Integrate floor_ plan filtering (Matt)
+- [ ] Walls, edges improve hole detection
+- [ ] Test robustness of floor_ plan filtering (Moe)
+- [x] determine surfaces of holes (Matt)
+- [x] Hole data structure (Moe)
     - Centroid
     - Point cloud of all boundary points
     - List of poses
     - Hole score
 - [ ] Approach to include trajectories
     - False positives rejected
-- [ ] Modular scoring mechanism
-- [ ] yaml stuff in main (Nasib)
+- [x] Modular scoring mechanism
+- [x] yaml stuff in main (Nasib)
 - [ ] 2D headings
 - [ ] Write a ReadMe
-- [ ] Presentation for 25th of April
+- [x] Presentation for 25th of April
+- [ ] Refine clustering (Matt)
+- [ ] Mesh Approach for score (Nasib)
+- [ ] trajectory approach for score (Moe)
 
 
 ###
 - [x] Goal 1: Approach for hole detection defined (30.03.2022)
-- [ ] Goal 2: Define Holes
-- [ ] Goal 3: Implemented holes (TBD)
+- [x] Goal 2: Define Holes
+- [x] Goal 3: Implemented holes (TBD)
 - [ ] Goal 4: position approach defined (TBD)
 - [ ] Goal 5: implemented position approach (TBD)
+- [ ] Goal 6: Everything works (18.5.)
 
 ### nice to haves
 - [ ] test edge detection in 3d point clouds (nasib)

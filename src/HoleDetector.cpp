@@ -64,11 +64,10 @@ void HoleDetector::calculate() {
     centers.clear();
     hole_sizes.clear();
     holes.clear();
-    poses.clear();
     Utils::getHoleClouds(interior_boundaries, boundary_search_radius, holes, hole_sizes);
     Utils::calcHoleCenters(holes, min_size, centers);
     Utils::calcHoleAreas(holes, hole_areas, cvxhull, hole_hull_cloud);
-    Utils::calcPoses(holes, centers, poses);
+
 }
 
 void HoleDetector::visualize() {

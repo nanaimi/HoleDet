@@ -34,11 +34,21 @@
 #include <pcl/surface/convex_hull.h>
 #include <pcl/surface/gp3.h>
 #include <pcl/ml/kmeans.h>
+#include <pcl/features/normal_3d_omp.h>
+#include <pcl/surface/poisson.h>
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/types.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+
+struct Hole {
+    pcl::PointXYZ centroid;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr points;
+    int size;
+    Eigen::Affine3d transforms;
+    float score;
+};
 
 class Utils {
     public:
@@ -46,65 +56,95 @@ class Utils {
     /// \param file_name string, e.g "hololens.pcd"
     /// \param reader pcl::PCDReader reader
     /// \return shared pointer pcl::PointCloud<pcl::PointXYZ>::Ptr
-    static pcl::PointCloud<pcl::PointXYZ>::Ptr readCloud(const std::basic_string<char> &file_name, pcl::PCDReader &reader);
+    static pcl::PointCloud<pcl::PointXYZ>::Ptr ReadCloud(const std::basic_string<char> &file_name,
+                                                         pcl::PCDReader &reader);
     ///
     /// \param cloud input point cloud
-    /// \param floor cloud to which unprojected floor will be extracted
-    /// \param floor_projected floor cloud projected to the estimated plane equation
+    /// \param floor cloud to which unprojected floor_ will be extracted
+    /// \param floor_projected floor_ cloud projected to the estimated plane equation
     /// \param coefficients coefficients of the estimated plane equation
-    static void extractAndProjectFloor(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr floor, pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected, pcl::ModelCoefficients::Ptr coefficients);
+    static void ExtractAndProjectFloor(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+                                       pcl::PointCloud<pcl::PointXYZ>::Ptr floor,
+                                       pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected,
+                                       pcl::ModelCoefficients::Ptr coefficients);
     ///
     /// \param input_cloud input point cloud
     /// \param hull_cloud point cloud containing the points on the concave hull
-    /// \param polygons the resultant concave hull polygons, as a set of vertices. The Vertices structure contains an array of point indices.
+    /// \param polygons the resultant concave hull polygons, as a set of vertices.
+    /// The Vertices structure contains an array of point indices.
     /// \param chull PCL concave hull object
-    static void createConcaveHull(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud, std::vector<pcl::Vertices> polygons, pcl::ConcaveHull<pcl::PointXYZ> chull);
+    static void CreateConcaveHull(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud,
+                                  pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud,
+                                  std::vector<pcl::Vertices> polygons, pcl::ConcaveHull<pcl::PointXYZ> chull);
     ///
     /// \param input_cloud input point cloud
     /// \param hull_cloud point cloud containing the points on the concave hull
     /// \param interior_boundaries point cloud containing the interior boundary points
-    static void getInteriorBoundaries(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries);
+    static void GetInteriorBoundaries(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud,
+                                      pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud,
+                                      pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries);
     ///
     /// \param interior_boundaries point cloud containing the interior boundary points
     /// \param holes vector containing the point clouds for the individual holes
     /// \param hole_sizes number of points in each hole point cloud
-    static void getHoleClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries, const float n_search_radius, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes, std::vector<int> &hole_sizes);
+    static void GetHoleClouds(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries,
+                              const float n_search_radius);
     ///
     /// \param holes vector containing the point clouds for the individual holes
     /// \param min_size minimum number of points in hole cloud required
     /// \param centers vector of points representing hole centers
-    static void calcHoleCenters(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes, const int &min_size, std::vector<pcl::PointXYZ> &centers);
+    static void CalcHoleCenters(std::vector<Hole> &holes);
 
-    static void calcHoleAreas(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes, std::vector<double> &hole_areas, pcl::ConvexHull<pcl::PointXYZ> cvxhull, pcl::PointCloud<pcl::PointXYZ>::Ptr hole_hull_cloud);
+    static void CalcAreaScore(std::vector<Hole> &holes, pcl::ConvexHull<pcl::PointXYZ> cvxhull);
 
     static void calcPoses(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes, std::vector<pcl::PointXYZ> &centers, std::vector<Eigen::Affine3f> &poses);
 
     /// Creates a Point Cloud from the image points vector
     /// \param cloud
     /// \param img_pts
-    static void createPointCloudFromImgPts(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
+    static void CreatePointCloudFromImgPts(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
                                            std::vector<cv::Point> img_pts,
                                            const float img_resolution);
 
     /// Draws a line between all points in the cloud
     /// \param cloud
     /// \param viewer
-    static void drawLinesInCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
+    static void DrawLinesInCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
                                  const pcl::visualization::PCLVisualizer::Ptr viewer);
 
-    /// Computes the rigid transformation from the points in the floorplan and the points in the cloud and then aplies the transform to the floorplan cloud
+    /// Computes the rigid transformation from the points in the floorplan and the points in the cloud and
+    /// then aplies the transform to the floorplan cloud
     /// \param cloud_in The cloud containing the vertices of the floorplan
-    /// \param cloud The cloud of the projected floor
-    /// \param points The points from the floor (NOT floorplan) cloud
+    /// \param cloud The cloud of the projected floor_
+    /// \param points The points from the floor_ (NOT floorplan) cloud
     /// \param max_iteration Number of max ransac iterations
     /// \param max_angle Max angle for random transformation
     /// \param max_translation Max Translation for random transformation
-    static void transformPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_in,
+    static void TransformPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_in,
                                     const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
                                     std::vector<Eigen::Vector3f> points,
                                     const int max_iteration,
                                     const int max_angle,
                                     const int max_translation);
+    /// Takes the vertices of the floorplan as input and creates a dense pointcloud with points along the walls of the map
+    /// \param floorplan The cloud containing the vertex points of the floorplan
+    /// \param dense_cloud The cloud where a dense set of points are added along the walls
+    /// \param z The height of the floor_ in the HoloLens coordinate frame
+    static void DenseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr& floorplan,
+                                    pcl::PointCloud<pcl::PointXYZ>::Ptr& dense_cloud,
+                                    pcl::ModelCoefficients::Ptr coefficients);
+
+    /// Adds all the points from the source_cloud to cloud.
+    /// \param source_cloud
+    /// \param cloud
+    static void CombinePointClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr& source_cloud,
+                                   pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud);
+
+    /// Creates mesh using poisson reconstruction
+    /// \param cloud
+    /// \param mesh
+    static void ConstructMesh(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PolygonMesh & mesh,
+                              const double normal_search_radius, const int poisson_depth);
 };
 #endif //HOLEDET_HOLEDET_UTILS_H
 

@@ -3,13 +3,14 @@
 //
 
 #include "holedet_utils.h"
-pcl::PointCloud<pcl::PointXYZ>::Ptr Utils::readCloud(const std::basic_string<char> &file_name, pcl::PCDReader &reader) {
+
+pcl::PointCloud<pcl::PointXYZ>::Ptr Utils::ReadCloud(const std::basic_string<char> &file_name, pcl::PCDReader &reader) {
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
     reader.read(file_name, *cloud);
     return cloud;
 }
 
-void Utils::extractAndProjectFloor(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+void Utils::ExtractAndProjectFloor(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
                                               pcl::PointCloud<pcl::PointXYZ>::Ptr floor,
                                               pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected,
                                               pcl::ModelCoefficients::Ptr coefficients) {
@@ -24,12 +25,12 @@ void Utils::extractAndProjectFloor(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
     seg.setDistanceThreshold(0.1);
     seg.setMaxIterations(10000);
 
-    // segment floor
+    // segment floor_
     seg.setInputCloud(cloud);
     seg.segment(*inliers, *coefficients);
     pcl::copyPointCloud<pcl::PointXYZ>(*cloud, *inliers, *floor);
 
-    // extract floor from input cloud
+    // extract floor_ from input cloud
     pcl::ExtractIndices<pcl::PointXYZ> extract;
     extract.setInputCloud(cloud);
     extract.setIndices(inliers);
@@ -157,20 +158,6 @@ void Utils::calcHoleCenters(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &ho
         pcl::PointXYZ center(hole_center.x(), hole_center.y(), hole_center.z());
 
         centers.push_back(center);
-    }
-}
-
-void Utils::calcPoses(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes,
-                            std::vector<pcl::PointXYZ> &centers, std::vector<Eigen::Affine3f> &poses ) {
-    for (int i = 0; i < holes.size(); ++i) {
-        Eigen::Affine3f pose = Eigen::Affine3f::Identity();
-        Eigen::Vector3d vec(centers[i].x-holes[i]->points[0].x, centers[i].y-holes[i]->points[0].y, centers[i].z-holes[i]->points[0].z);
-
-        pose.translation() = Eigen::Vector3f(holes[i]->points[0].x,holes[i]->points[0].y,holes[i]->points[0].z);
-        pose.rotate(Eigen::AngleAxisf(atan2(vec(1),vec(0)), Eigen::Vector3f(0,0,1)));
-        pose.rotate(Eigen::AngleAxisf(atan2(vec(2),sqrt(vec(0)*vec(0)+vec(1)*vec(1))), Eigen::Vector3f(0,1,0)));
-
-        poses.push_back(pose);
     }
 }
 
