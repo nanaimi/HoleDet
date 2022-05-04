@@ -18,4 +18,4 @@ parameters:
   pass_ylim_min: -15.0
   pass_ylim_max: 25.0
   start_score: 5.0
-  boundary_search_radius: 0.6
+  boundary_search_radius: 0.9

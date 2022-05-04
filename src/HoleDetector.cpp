@@ -73,16 +73,13 @@ void HoleDetector::InitFilters() {
     outrem_.setMinNeighborsInRadius (5);
     outrem_.setKeepOrganized(true);
 
-    voxel_filter_.setMinimumPointsNumberPerVoxel(2);
-    voxel_filter_.setLeafSize (0.1, 0.1, 0.1);
+//    voxel_filter_.setMinimumPointsNumberPerVoxel(1);
+//    voxel_filter_.setLeafSize (0.05, 0.05, 0.05);
 }
 
 void HoleDetector::PreProcess() {
     outrem_.setInputCloud(raw_cloud_);
     outrem_.filter (*filtered_cloud_);
-
-    // voxel_filter_.setInputCloud (filtered_cloud_);
-    // voxel_filter_.filter(*filtered_cloud_);
 
 }
 
@@ -95,6 +92,8 @@ void HoleDetector::DetectHoles() {
 }
 
 void HoleDetector::CalculateCentroids() {
+//     voxel_filter_.setInputCloud (interior_boundaries_);
+//     voxel_filter_.filter(*interior_boundaries_);
     Utils::GetHoleClouds(holes_, interior_boundaries_, boundary_search_radius_);
     Utils::CalcHoleCenters(holes_);
     std::cout << holes_.size() << "\n";
