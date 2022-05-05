@@ -388,5 +388,20 @@ void Utils::ConstructMesh(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
     /* end poisson reconstruction */
 }
 
+void Utils::CalcPoses(std::vector<Hole> &holes) {
+    for (int i = 0; i < holes.size(); ++i) {
 
+        Eigen::Affine3f pose = Eigen::Affine3f::Identity();
+        Eigen::Vector3f centroid_vec = holes[i].centroid.getVector3fMap();
+        Eigen::Vector3f point_vec = holes[i].points->points[0].getVector3fMap();
+
+        Eigen::Vector3f vec = centroid_vec - point_vec;
+
+        pose.translation() = point_vec;
+        pose.rotate(Eigen::AngleAxisf(atan2(vec(1),vec(0)), Eigen::Vector3f(0,0,1)));
+        pose.rotate(Eigen::AngleAxisf(atan2(vec(2),sqrt(vec(0)*vec(0)+vec(1)*vec(1))), Eigen::Vector3f(0,1,0)));
+
+        holes[i].poses = pose;
+    }
+}
 
