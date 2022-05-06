@@ -48,7 +48,7 @@ struct Hole {
     pcl::PointXYZ centroid;
     pcl::PointCloud<pcl::PointXYZ>::Ptr points;
     int size;
-    Eigen::Affine3f poses;
+    std::vector<Eigen::Affine3f> poses;
     float score;
 };
 
