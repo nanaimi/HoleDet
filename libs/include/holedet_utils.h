@@ -100,8 +100,6 @@ class Utils {
 
     static void CalcAreaScore(std::vector<Hole> &holes, pcl::ConvexHull<pcl::PointXYZ> cvxhull);
 
-    static void calcPoses(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &holes, std::vector<pcl::PointXYZ> &centers, std::vector<Eigen::Affine3f> &poses);
-
     /// Creates a Point Cloud from the image points vector
     /// \param cloud
     /// \param img_pts
