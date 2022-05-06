@@ -143,9 +143,6 @@ void HoleDetector::Visualize() {
     viewer_->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
                                                0.0f, 0.2f, 0.8f, "interior_boundaries_");
     viewer_->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 0.1, "interior_boundaries_");
-    viewer_->addPointCloudNormals<pcl::PointXYZ,pcl::Normal>(interior_boundaries_, boundary_normals_, 1,0.2);
-
-//    Utils::drawLinesInCloud(floorplan_, viewer_);
 
     for (int i = 0; i < holes_.size(); i++) {
         if (holes_[i].score < min_score_) { continue; }
@@ -246,6 +243,17 @@ void HoleDetector::KeyboardEventOccurred(const visualization::KeyboardEvent &eve
             event_viewer->addPointCloud(filtered_cloud_, "cloud");
             event_viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR, 0.0f, 1.0f, 0.0f, "cloud");
             event_viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2,"cloud");
+        }
+    }
+    if (event.getKeySym () == "n" && event.keyDown ())
+    {
+
+        if (event_viewer->contains("boundary_normals")) {
+            cout << "n was pressed => removing boundary_normals" << endl;
+            event_viewer->removePointCloud("boundary_normals");
+        } else {
+            cout << "n was pressed => showing boundary_normals" << endl;
+            event_viewer->addPointCloudNormals<pcl::PointXYZ,pcl::Normal>(interior_boundaries_, boundary_normals_, 1,0.2, "boundary_normals");
         }
     }
 
