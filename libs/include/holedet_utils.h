@@ -41,12 +41,14 @@
 #include <opencv2/core/types.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include "Normal2dEstimation.h"
+
 
 struct Hole {
     pcl::PointXYZ centroid;
     pcl::PointCloud<pcl::PointXYZ>::Ptr points;
     int size;
-    Eigen::Affine3d transforms;
+    Eigen::Affine3f poses;
     float score;
 };
 
@@ -82,13 +84,14 @@ class Utils {
     /// \param interior_boundaries point cloud containing the interior boundary points
     static void GetInteriorBoundaries(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud,
                                       pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud,
-                                      pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries);
+                                      pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries,
+                                      pcl::PointCloud<pcl::Normal>::Ptr normals);
     ///
     /// \param interior_boundaries point cloud containing the interior boundary points
     /// \param holes vector containing the point clouds for the individual holes
     /// \param hole_sizes number of points in each hole point cloud
     static void GetHoleClouds(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries,
-                              const float n_search_radius);
+                              const float n_search_radius, pcl::PointCloud<pcl::Normal>::Ptr boundary_normals, const float angle_thresh);
     ///
     /// \param holes vector containing the point clouds for the individual holes
     /// \param min_size minimum number of points in hole cloud required
@@ -143,6 +146,10 @@ class Utils {
     /// \param mesh
     static void ConstructMesh(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PolygonMesh & mesh,
                               const double normal_search_radius, const int poisson_depth);
+
+    static void Calc2DNormals(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::Normal>::Ptr normals, float search_radius);
+
+    static void CalcPoses(std::vector<Hole> &holes);
 };
 #endif //HOLEDET_HOLEDET_UTILS_H
 
