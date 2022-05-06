@@ -48,7 +48,7 @@ struct Hole {
     pcl::PointXYZ centroid;
     pcl::PointCloud<pcl::PointXYZ>::Ptr points;
     int size;
-    Eigen::Affine3d transforms;
+    Eigen::Affine3f poses;
     float score;
 };
 
@@ -148,6 +148,8 @@ class Utils {
                               const double normal_search_radius, const int poisson_depth);
 
     static void Calc2DNormals(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::Normal>::Ptr normals, float search_radius);
+
+    static void CalcPoses(std::vector<Hole> &holes);
 };
 #endif //HOLEDET_HOLEDET_UTILS_H
 
