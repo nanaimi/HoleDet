@@ -408,7 +408,7 @@ void Utils::Calc2DNormals(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointC
     norm_estim.setInputCloud(cloud);
     norm_estim.setSearchMethod (tree);
 
-    norm_estim.setRadiusSearch (0.6);
+    norm_estim.setRadiusSearch (search_radius);
 
     norm_estim.compute(normals);
 }
@@ -427,5 +427,21 @@ void Utils::CalcPoses(std::vector<Hole> &holes) {
         pose.rotate(Eigen::AngleAxisf(atan2(vec(2),sqrt(vec(0)*vec(0)+vec(1)*vec(1))), Eigen::Vector3f(0,1,0)));
 
         holes[i].poses = pose;
+    }
+}
+
+void Utils::Grid(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
+    pcl::VoxelGrid<pcl::PointXYZ> grid;
+//    grid.setInputCloud(cloud);
+    grid.setLeafSize(0.1f, 0.1f, 0.1f);
+    auto coords = grid.getGridCoordinates(0,0,0);
+    coords = grid.getGridCoordinates(1,3,0);
+    coords = grid.getGridCoordinates(1,2,0);
+}
+
+void Utils::CreateGrid(pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud, pcl::VoxelGrid<pcl::PointXYZ> grid, Eigen::MatrixXf &grid_matrix) {
+    for (auto point : dense_cloud->points) {
+        auto coords = grid.getGridCoordinates(point.x, point.y, point.z);
+        grid_matrix(coords.x()+500, coords.y()+500) = 1;
     }
 }

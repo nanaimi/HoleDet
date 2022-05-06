@@ -93,6 +93,14 @@ void HoleDetector::PreProcess() {
 void HoleDetector::DetectHoles() {
     Utils::DenseFloorplanCloud(floorplan_, dense_floorplan_, floor_coefficients_);
     Utils::CreateConcaveHull(floor_projected_, hull_cloud_, hull_polygons_, chull_);
+
+    pcl::VoxelGrid<pcl::PointXYZ> grid;
+    grid.setLeafSize(0.1f, 0.1f, 0.1f);
+    Eigen::MatrixXf grid_matrix(1000,1000);
+    grid_matrix = Eigen::MatrixXf::Zero(1000,1000);
+    Utils::CreateGrid(dense_floorplan_, grid, grid_matrix);
+    std::cout << grid_matrix << std::endl;
+
     Utils::CombinePointClouds(hull_cloud_, dense_floorplan_);
     Utils::GetInteriorBoundaries(floor_projected_, dense_floorplan_, interior_boundaries_, floor_normals_);
     Utils::Calc2DNormals(interior_boundaries_, boundary_normals_, boundary_search_radius_);

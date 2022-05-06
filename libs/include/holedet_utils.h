@@ -150,6 +150,10 @@ class Utils {
     static void Calc2DNormals(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::Normal>::Ptr normals, float search_radius);
 
     static void CalcPoses(std::vector<Hole> &holes);
+
+    static void Grid(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
+
+    static void CreateGrid(pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud, pcl::VoxelGrid<pcl::PointXYZ> grid, Eigen::MatrixXf &grid_matrix);
 };
 #endif //HOLEDET_HOLEDET_UTILS_H
 
