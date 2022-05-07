@@ -2,7 +2,9 @@
 debug: false
 input:
   cloud_file: /data/hololens.pcd
-  trajectory_file: /data/talstrasse/trajectories/gaze_directions.obj
+  gaze_file: /data/gaze_directions.obj
+  trajectory_file: /data/trajectory.pcd
+  lengths_file: /data/trajectory_lengths.txt
   floorplan_file: /data/floorplan.jpg
 parameters:
   poisson_depth: 6

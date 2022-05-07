@@ -38,6 +38,8 @@ private:
     basic_string<char> config_file_;
     basic_string<char> pointcloud_file_;
     basic_string<char> trajectory_file_;
+    basic_string<char> gaze_file_;
+    basic_string<char> lengths_file_;
     basic_string<char> floorplan_file_;
     PCDReader reader;
 
@@ -84,6 +86,9 @@ private:
     PointCloud<PointXYZ>::Ptr dense_floorplan_;
     pcl::PointCloud<pcl::Normal>::Ptr floor_normals_;
     pcl::PointCloud<pcl::Normal>::Ptr boundary_normals_;
+
+    std::vector<PointCloud<PointXYZ>::Ptr> trajectories_;
+    std::vector<std::vector<Eigen::Vector3f>> gazes_;
 
 
     pcl::ModelCoefficients::Ptr floor_coefficients_;

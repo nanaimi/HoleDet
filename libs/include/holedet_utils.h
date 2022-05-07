@@ -11,6 +11,7 @@
 #include <math.h>
 #include <string>
 #include <numeric>
+#include <fstream>
 
 #include <pcl/point_types.h>
 #include <pcl/io/pcd_io.h>
@@ -60,6 +61,14 @@ class Utils {
     /// \return shared pointer pcl::PointCloud<pcl::PointXYZ>::Ptr
     static pcl::PointCloud<pcl::PointXYZ>::Ptr ReadCloud(const std::basic_string<char> &file_name,
                                                          pcl::PCDReader &reader);
+
+    static void ReadTrajectoriesAndGaze(const std::basic_string<char> &traj_file_name,
+                                        const std::basic_string<char> &gaze_file_name,
+                                        const std::basic_string<char> &lenghts_file_name,
+                                        pcl::PCDReader &reader,
+                                        std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& trajectories,
+                                        std::vector<std::vector<Eigen::Vector3f>>& gazes);
+
     ///
     /// \param cloud input point cloud
     /// \param floor cloud to which unprojected floor_ will be extracted
@@ -111,6 +120,10 @@ class Utils {
     /// \param cloud
     /// \param viewer
     static void DrawLinesInCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
+                                 const pcl::visualization::PCLVisualizer::Ptr viewer);
+
+    static void DrawGazesInCloud(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& trajectories,
+                                 const std::vector<std::vector<Eigen::Vector3f>>& gazes,
                                  const pcl::visualization::PCLVisualizer::Ptr viewer);
 
     /// Computes the rigid transformation from the points in the floorplan and the points in the cloud and

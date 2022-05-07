@@ -33,6 +33,8 @@ HoleDetector::HoleDetector(const basic_string<char> &path, const basic_string<ch
 
     InitFilters();
     raw_cloud_ = Utils::ReadCloud(pointcloud_file_, reader);
+    Utils::ReadTrajectoriesAndGaze(trajectory_file_, gaze_file_,
+                                        lengths_file_, reader, trajectories_, gazes_);
     PreProcess();
     Utils::ExtractAndProjectFloor(filtered_cloud_, floor_, floor_projected_,
                                         floor_coefficients_);
@@ -45,6 +47,8 @@ void HoleDetector::ReadYAML() {
         std::cout << "loading" << std::endl;
         pointcloud_file_ = path_ + config["input"]["cloud_file"].as<std::string>();
         trajectory_file_ = path_ + config["input"]["trajectory_file"].as<std::string>();
+        gaze_file_ = path_ + config["input"]["gaze_file"].as<std::string>();
+        lengths_file_ = path_ + config["input"]["lengths_file"].as<std::string>();
         floorplan_file_ = path_ + config["input"]["floorplan_file"].as<std::string>();
 
         kStartScore_ = config["parameters"]["start_score"].as<float>();
@@ -134,7 +138,7 @@ void HoleDetector::Visualize() {
 
     viewer_ ->addPointCloud(floor_projected_, "floor_projected_");
     viewer_->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
-                                               0.0f, 0.2f, 0.8f, "floor_projected_");
+                                      0.0f, 0.2f, 0.8f, "floor_projected_");
     viewer_->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "floor_projected_");
 
     viewer_->addPointCloud(floorplan_, "floorplan");
@@ -170,6 +174,8 @@ void HoleDetector::Visualize() {
         viewer_->addCoordinateSystem(0.5, holes_[i].poses); //display pose
 
     }
+
+    Utils::DrawGazesInCloud(trajectories_, gazes_, viewer_);
 
     viewer_->registerPointPickingCallback(PpCallback, (void*)&viewer_);
     viewer_->registerKeyboardCallback (&HoleDetector::KeyboardEventOccurred, *this, (void*)&viewer_);
