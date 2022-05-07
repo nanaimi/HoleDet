@@ -167,6 +167,15 @@ class Utils {
     static void Grid(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
 
     static void CreateGrid(pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud, pcl::VoxelGrid<pcl::PointXYZ> grid, Eigen::MatrixXf &grid_matrix);
+
+    static bool CalculateNextGridPoint(const Eigen::Vector3f& gaze, const pcl::VoxelGrid<pcl::PointXYZ>& grid,
+                                                  pcl::PointXYZ curr_point, std::vector<Eigen::Vector3i>& visited,
+                                                  pcl::PointXYZ& next_point,
+                                                  Eigen::MatrixXf grid_matrix,
+                                                  int offset=500,
+                                                  float step_size=0.01);
+
+    static float CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ gaze_point);
 };
 #endif //HOLEDET_HOLEDET_UTILS_H
 

@@ -509,3 +509,30 @@ void Utils::CreateGrid(pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud, pcl::Vo
         grid_matrix(coords.x()+500, coords.y()+500) = 1;
     }
 }
+
+bool Utils::CalculateNextGridPoint(const Eigen::Vector3f& gaze, const pcl::VoxelGrid<pcl::PointXYZ>& grid,
+                                              pcl::PointXYZ curr_point,
+                                              std::vector<Eigen::Vector3i>& visited,
+                                              pcl::PointXYZ& next_point,
+                                              Eigen::MatrixXf grid_matrix,
+                                              int offset, float step_size) {
+    for(int i = 0; i < 10 / step_size; i++) {
+        float x = curr_point.x + i * step_size * gaze.x();
+        float y = curr_point.y + i * step_size * gaze.y();
+        Eigen::Vector3i next_coord = grid.getGridCoordinates(x, y, curr_point.z);
+        bool in_grid = grid_matrix(next_coord.x() + offset, next_coord.y() + offset);
+        bool not_visited = std::count(visited.begin(), visited.end(), next_coord) == 0;
+        if (not_visited && in_grid) {
+            next_point = pcl::PointXYZ(x, y, curr_point.z);
+            visited.push_back(next_coord);
+            return true;
+        }
+    }
+    return false;
+}
+
+float Utils::CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ gaze_point){
+    float dist = std::sqrt(std::pow(grid_point.x - gaze_point.x, 2) +
+                                std::pow(grid_point.y - gaze_point.y, 2));
+    return dist > 10 ? 0 : std::exp(-0.43 * dist);
+}

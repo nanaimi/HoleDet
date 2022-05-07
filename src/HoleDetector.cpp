@@ -103,13 +103,23 @@ void HoleDetector::DetectHoles() {
     Eigen::MatrixXf grid_matrix(1000,1000);
     grid_matrix = Eigen::MatrixXf::Zero(1000,1000);
     Utils::CreateGrid(dense_floorplan_, grid, grid_matrix);
-    std::cout << grid_matrix << std::endl;
+    float score = 0.0f;
+    PointXYZ last_point = trajectories_[0]->points[0];
+    PointXYZ next_point = last_point;
+    std::vector<Eigen::Vector3i> visited;
+    while(Utils::CalculateNextGridPoint(gazes_[0][0], grid, last_point, visited, next_point, grid_matrix)) {
+        score = Utils::CalculateScoreFromDistance(next_point, trajectories_[0]->points[0]);
+        last_point = next_point;
+        auto coord = grid.getGridCoordinates(next_point.x, next_point.y, next_point.z);
+        cout << "x\t" << coord.x() << "\ty\t" << coord.y() << "\tscore\t" << score << "\n";
+    }
 
-    Utils::CombinePointClouds(hull_cloud_, dense_floorplan_);
-    Utils::GetInteriorBoundaries(floor_projected_, dense_floorplan_, interior_boundaries_, floor_normals_);
-    Utils::Calc2DNormals(interior_boundaries_, boundary_normals_, boundary_search_radius_);
-    CalculateCentroids();
-    Utils::CalcPoses(holes_);
+
+    // Utils::CombinePointClouds(hull_cloud_, dense_floorplan_);
+    // Utils::GetInteriorBoundaries(floor_projected_, dense_floorplan_, interior_boundaries_, floor_normals_);
+    // Utils::Calc2DNormals(interior_boundaries_, boundary_normals_, boundary_search_radius_);
+    // CalculateCentroids();
+    // Utils::CalcPoses(holes_);
 }
 
 void HoleDetector::CalculateCentroids() {
@@ -140,7 +150,7 @@ void HoleDetector::Visualize() {
     viewer_->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
                                       0.0f, 0.2f, 0.8f, "floor_projected_");
     viewer_->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "floor_projected_");
-
+    /*
     viewer_->addPointCloud(floorplan_, "floorplan");
     viewer_->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
                                                0.5f, 0.0f, 0.5f, "floorplan");
@@ -172,10 +182,12 @@ void HoleDetector::Visualize() {
         pcl::PointXYZ p(holes_[i].poses.translation().x(), holes_[i].poses.translation().y(), holes_[i].poses.translation().z());
         viewer_->addSphere(p,0.1,r1,1 - r1,r3, center_name + "_pose"); //add colour sphere to pose
         viewer_->addCoordinateSystem(0.5, holes_[i].poses); //display pose
+    }*/
 
-    }
-
-    Utils::DrawGazesInCloud(trajectories_, gazes_, viewer_);
+    // Utils::DrawGazesInCloud(trajectories_, gazes_, viewer_);
+    pcl::PointXYZ p1 = trajectories_[0]->points[0];
+    pcl::PointXYZ p2(p1.x + gazes_[0][0].x(), p1.y + gazes_[0][0].y(), p1.z + gazes_[0][0].z());
+    viewer_->addArrow(p2, p1, 1, 0, 0, false, "test_arrow");
 
     viewer_->registerPointPickingCallback(PpCallback, (void*)&viewer_);
     viewer_->registerKeyboardCallback (&HoleDetector::KeyboardEventOccurred, *this, (void*)&viewer_);
