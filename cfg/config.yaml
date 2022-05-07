@@ -21,3 +21,4 @@ parameters:
   pass_ylim_max: 25.0
   start_score: 5.0
   boundary_search_radius: 0.6
+  angle_thresh: 0.8

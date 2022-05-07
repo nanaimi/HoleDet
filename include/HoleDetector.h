@@ -84,6 +84,8 @@ private:
     PointCloud<PointXYZ>::Ptr floor_projected_;
     PointCloud<PointXYZ>::Ptr floorplan_;
     PointCloud<PointXYZ>::Ptr dense_floorplan_;
+    pcl::PointCloud<pcl::Normal>::Ptr floor_normals_;
+    pcl::PointCloud<pcl::Normal>::Ptr boundary_normals_;
 
     std::vector<PointCloud<PointXYZ>::Ptr> trajectories_;
     std::vector<std::vector<Eigen::Vector3f>> gazes_;
@@ -100,6 +102,7 @@ private:
     // Tuning Parameters
     double min_score_;
     float boundary_search_radius_;
+    float angle_thresh_;
 
 
     void ReadYAML();

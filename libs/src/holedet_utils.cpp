@@ -101,14 +101,14 @@ void Utils::CreateConcaveHull(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud,
 
 void Utils::GetInteriorBoundaries(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud,
                                              pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud,
-                                             pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries) {
-    pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>);
+                                             pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries,
+                                             pcl::PointCloud<pcl::Normal>::Ptr normals) {
     // estimate normals and fill in \a normals
     pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
     ne.setInputCloud(input_cloud);
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>());
     ne.setSearchMethod(tree);
-    // Use all neighbors in a sphere of radius 3cm
+    // Use all neighbors in a sphere of radius 30cm
     ne.setRadiusSearch(0.3);
     ne.compute(*normals);
 
@@ -143,7 +143,7 @@ void Utils::GetInteriorBoundaries(pcl::PointCloud<pcl::PointXYZ>::Ptr input_clou
 }
 
 void Utils::GetHoleClouds(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries,
-                          const float n_search_radius) {
+                          const float n_search_radius, pcl::PointCloud<pcl::Normal>::Ptr boundary_normals, const float angle_thresh) {
     pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
     kdtree.setInputCloud(interior_boundaries);
 
@@ -156,6 +156,7 @@ void Utils::GetHoleClouds(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXY
 
         Hole hole;
         pcl::PointXYZ search_point = interior_boundaries->points[start_point];
+        pcl::Normal search_normal = boundary_normals->points[start_point];
         std::vector<int> pointIdxRadiusSearch;
         std::vector<float> pointRadiusSquaredDistance;
 
@@ -166,12 +167,26 @@ void Utils::GetHoleClouds(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXY
         std::deque<int> to_visit;
         do {
             kdtree.radiusSearch(search_point, n_search_radius, pointIdxRadiusSearch, pointRadiusSquaredDistance);
-
+            // for all points within the search radius
             for (auto p: pointIdxRadiusSearch) {
+                // check if the point has already been visited and if it has already been added to the queue
                 if (!std::count(visited.begin(), visited.end(), p) &&
                     std::find(to_visit.begin(), to_visit.end(), p) == to_visit.end()) {
+                    // check if the point has a valid index
                     if (p < interior_boundaries->points.size() && p > 0) {
-                        to_visit.push_back(p);
+                        // add point to queue
+                        pcl::Normal p_normal = boundary_normals->points[p];
+                        float dot_product = search_normal.normal_x * p_normal.normal_x + search_normal.normal_y * p_normal.normal_y;
+                        if (dot_product<0){
+                            p_normal.normal_x = p_normal.normal_x * (-1);
+                            p_normal.normal_y = p_normal.normal_y * (-1);
+                        }
+                        dot_product = search_normal.normal_x * p_normal.normal_x + search_normal.normal_y * p_normal.normal_y;
+                        float mag = sqrt(pow(search_normal.normal_x, 2) + pow(search_normal.normal_y, 2)) * sqrt(pow(p_normal.normal_x, 2) + pow(p_normal.normal_y, 2));
+                        float angle = acos(dot_product / mag);
+                        if (angle<angle_thresh) {
+                            to_visit.push_back(p);
+                        }
                     }
                 }
             }
@@ -180,13 +195,16 @@ void Utils::GetHoleClouds(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXY
             if (point_idx < interior_boundaries->points.size() && point_idx > 0) {
                 hole_cloud->push_back(interior_boundaries->points[point_idx]);
                 search_point = interior_boundaries->points[point_idx];
+                search_normal = boundary_normals->points[point_idx];
                 visited.push_back(point_idx);
             } else { break; }
 
         } while (!to_visit.empty());
         hole.points = hole_cloud;
         hole.size = hole_cloud->points.size();
-        holes.push_back(hole);
+        if (hole.size>5) {
+            holes.push_back(hole);
+        }
     }
 }
 
@@ -447,5 +465,47 @@ void Utils::ConstructMesh(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
     /* end poisson reconstruction */
 }
 
+void Utils::Calc2DNormals(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::Normal>::Ptr normals, float search_radius) {
+    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
 
+    Normal2dEstimation norm_estim;
+    norm_estim.setInputCloud(cloud);
+    norm_estim.setSearchMethod (tree);
 
+    norm_estim.setRadiusSearch (search_radius);
+
+    norm_estim.compute(normals);
+}
+
+void Utils::CalcPoses(std::vector<Hole> &holes) {
+    for (int i = 0; i < holes.size(); ++i) {
+
+        Eigen::Affine3f pose = Eigen::Affine3f::Identity();
+        Eigen::Vector3f centroid_vec = holes[i].centroid.getVector3fMap();
+        Eigen::Vector3f point_vec = holes[i].points->points[0].getVector3fMap();
+
+        Eigen::Vector3f vec = centroid_vec - point_vec;
+
+        pose.translation() = point_vec;
+        pose.rotate(Eigen::AngleAxisf(atan2(vec(1),vec(0)), Eigen::Vector3f(0,0,1)));
+        pose.rotate(Eigen::AngleAxisf(atan2(vec(2),sqrt(vec(0)*vec(0)+vec(1)*vec(1))), Eigen::Vector3f(0,1,0)));
+
+        holes[i].poses = pose;
+    }
+}
+
+void Utils::Grid(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
+    pcl::VoxelGrid<pcl::PointXYZ> grid;
+//    grid.setInputCloud(cloud);
+    grid.setLeafSize(0.1f, 0.1f, 0.1f);
+    auto coords = grid.getGridCoordinates(0,0,0);
+    coords = grid.getGridCoordinates(1,3,0);
+    coords = grid.getGridCoordinates(1,2,0);
+}
+
+void Utils::CreateGrid(pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud, pcl::VoxelGrid<pcl::PointXYZ> grid, Eigen::MatrixXf &grid_matrix) {
+    for (auto point : dense_cloud->points) {
+        auto coords = grid.getGridCoordinates(point.x, point.y, point.z);
+        grid_matrix(coords.x()+500, coords.y()+500) = 1;
+    }
+}

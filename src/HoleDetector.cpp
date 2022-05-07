@@ -20,13 +20,16 @@ HoleDetector::HoleDetector(const basic_string<char> &path, const basic_string<ch
         floorplan_(new PointCloud<PointXYZ>),
         dense_floorplan_(new PointCloud<PointXYZ>),
         viewer_ (new visualization::PCLVisualizer ("3D Viewer")),
-        floor_coefficients_ (new ModelCoefficients)
+        floor_coefficients_ (new ModelCoefficients),
+        floor_normals_(new pcl::PointCloud<pcl::Normal>),
+        boundary_normals_(new pcl::PointCloud<pcl::Normal>)
 {
     path_ = path;
     config_file_ = config_filename;
     ReadYAML();
     min_score_ = 4;
     tp_.cnt = 0;
+
 
     InitFilters();
     raw_cloud_ = Utils::ReadCloud(pointcloud_file_, reader);
@@ -66,6 +69,7 @@ void HoleDetector::ReadYAML() {
         kPassYLimMax_ = config["parameters"]["pass_ylim_max"].as<double>();
 
         boundary_search_radius_ = config["parameters"]["boundary_search_radius"].as<float>();
+        angle_thresh_ = config["parameters"]["angle_thresh"].as<float>();
 
     } catch(const YAML::ParserException& ex) {
         std::cout << ex.what() << std::endl;
@@ -93,13 +97,23 @@ void HoleDetector::PreProcess() {
 void HoleDetector::DetectHoles() {
     Utils::DenseFloorplanCloud(floorplan_, dense_floorplan_, floor_coefficients_);
     Utils::CreateConcaveHull(floor_projected_, hull_cloud_, hull_polygons_, chull_);
+
+    pcl::VoxelGrid<pcl::PointXYZ> grid;
+    grid.setLeafSize(0.1f, 0.1f, 0.1f);
+    Eigen::MatrixXf grid_matrix(1000,1000);
+    grid_matrix = Eigen::MatrixXf::Zero(1000,1000);
+    Utils::CreateGrid(dense_floorplan_, grid, grid_matrix);
+    std::cout << grid_matrix << std::endl;
+
     Utils::CombinePointClouds(hull_cloud_, dense_floorplan_);
-    Utils::GetInteriorBoundaries(floor_projected_, dense_floorplan_, interior_boundaries_);
+    Utils::GetInteriorBoundaries(floor_projected_, dense_floorplan_, interior_boundaries_, floor_normals_);
+    Utils::Calc2DNormals(interior_boundaries_, boundary_normals_, boundary_search_radius_);
     CalculateCentroids();
+    Utils::CalcPoses(holes_);
 }
 
 void HoleDetector::CalculateCentroids() {
-    Utils::GetHoleClouds(holes_, interior_boundaries_, boundary_search_radius_);
+    Utils::GetHoleClouds(holes_, interior_boundaries_, boundary_search_radius_, boundary_normals_, angle_thresh_);
     Utils::CalcHoleCenters(holes_);
     std::cout << holes_.size() << "\n";
     for(auto& hole : holes_) {
@@ -122,11 +136,11 @@ void HoleDetector::CalculateScores() {
 
 void HoleDetector::Visualize() {
 
-    viewer_ ->addPointCloud(floor_, "floor_");
+    viewer_ ->addPointCloud(floor_projected_, "floor_projected_");
     viewer_->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
-                                               0.0f, 0.2f, 0.8f, "floor_");
-    viewer_->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "floor_");
-    /*
+                                      0.0f, 0.2f, 0.8f, "floor_projected_");
+    viewer_->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "floor_projected_");
+
     viewer_->addPointCloud(floorplan_, "floorplan");
     viewer_->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
                                                0.5f, 0.0f, 0.5f, "floorplan");
@@ -137,7 +151,10 @@ void HoleDetector::Visualize() {
                                                1.0f, 0.0f, 0.0f, "dense_floor");
     viewer_->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 1, "dense_floor");
 
-//    Utils::drawLinesInCloud(floorplan_, viewer_);
+    viewer_ ->addPointCloud(interior_boundaries_, "interior_boundaries_");
+    viewer_->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
+                                               0.0f, 0.2f, 0.8f, "interior_boundaries_");
+    viewer_->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 0.1, "interior_boundaries_");
 
     for (int i = 0; i < holes_.size(); i++) {
         if (holes_[i].score < min_score_) { continue; }
@@ -151,8 +168,12 @@ void HoleDetector::Visualize() {
         auto center_name = "hole_center_" + std::to_string(i);
         viewer_->addSphere(holes_[i].centroid, 0.3, r1, 1 - r1, r3, center_name);
 
+        //Handle poses visualisation
+        pcl::PointXYZ p(holes_[i].poses.translation().x(), holes_[i].poses.translation().y(), holes_[i].poses.translation().z());
+        viewer_->addSphere(p,0.1,r1,1 - r1,r3, center_name + "_pose"); //add colour sphere to pose
+        viewer_->addCoordinateSystem(0.5, holes_[i].poses); //display pose
 
-    }*/
+    }
 
     Utils::DrawGazesInCloud(trajectories_, gazes_, viewer_);
 
@@ -236,6 +257,17 @@ void HoleDetector::KeyboardEventOccurred(const visualization::KeyboardEvent &eve
             event_viewer->addPointCloud(filtered_cloud_, "cloud");
             event_viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR, 0.0f, 1.0f, 0.0f, "cloud");
             event_viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2,"cloud");
+        }
+    }
+    if (event.getKeySym () == "n" && event.keyDown ())
+    {
+
+        if (event_viewer->contains("boundary_normals")) {
+            cout << "n was pressed => removing boundary_normals" << endl;
+            event_viewer->removePointCloud("boundary_normals");
+        } else {
+            cout << "n was pressed => showing boundary_normals" << endl;
+            event_viewer->addPointCloudNormals<pcl::PointXYZ,pcl::Normal>(interior_boundaries_, boundary_normals_, 1,0.2, "boundary_normals");
         }
     }
 
