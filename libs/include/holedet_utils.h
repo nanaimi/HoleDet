@@ -175,7 +175,7 @@ class Utils {
                                                   int offset=500,
                                                   float step_size=0.01);
 
-    static float CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ gaze_point);
+    static float CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ gaze_point, const pcl::visualization::PCLVisualizer::Ptr viewer);
 };
 #endif //HOLEDET_HOLEDET_UTILS_H
 

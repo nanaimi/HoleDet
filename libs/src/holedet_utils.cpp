@@ -504,6 +504,44 @@ void Utils::Grid(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
 }
 
 void Utils::CreateGrid(pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud, pcl::VoxelGrid<pcl::PointXYZ> grid, Eigen::MatrixXf &grid_matrix) {
+
+
+    /*
+    pcl::PointXYZ max;
+    pcl::PointXYZ min;
+    pcl::CropBox<pcl::PointXYZ> crop;
+    crop.setInputCloud(dense_cloud);
+    pcl::getMinMax3D(*dense_cloud, min, max);
+    int min_x = static_cast<int>(min.x);
+    int max_x = static_cast<int>(max.x + 1);
+
+    for(int i = min_x; i <= max_x; i++) {
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cropped_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointXYZ cropped_min;
+        pcl::PointXYZ cropped_max;
+        Eigen::Vector4f min_vec(i - 0.5, min.y, min.z, 1.0);
+        Eigen::Vector4f max_vec(i + 0.5, max.y, max.z, 1.0);
+        crop.setMin(min_vec);
+        crop.setMax(max_vec);
+        crop.filter(*cropped_cloud);
+        if(cropped_cloud->width == 0) {
+            continue;
+        }
+        pcl::getMinMax3D(*cropped_cloud, cropped_min, cropped_max);
+
+        Eigen::Vector3i coord_min = grid.getGridCoordinates(cropped_min.x, cropped_min.y, cropped_min.z);
+        Eigen::Vector3i coord_max = grid.getGridCoordinates(cropped_max.x, cropped_max.y, cropped_max.z);
+
+        for(int it_x = coord_min.x(); it_x <= coord_max.x(); it_x++) {
+            for(int it_y = coord_min.y(); it_y <= coord_max.y(); it_y++) {
+                if(it_x == 33 && it_y == 3) {
+                    std::cout << "Yes\n";
+                }
+                grid_matrix(it_x + 500, it_y + 500) = 1;
+            }
+        }
+    }*/
+
     for (auto point : dense_cloud->points) {
         auto coords = grid.getGridCoordinates(point.x, point.y, point.z);
         grid_matrix(coords.x()+500, coords.y()+500) = 1;
@@ -520,9 +558,11 @@ bool Utils::CalculateNextGridPoint(const Eigen::Vector3f& gaze, const pcl::Voxel
         float x = curr_point.x + i * step_size * gaze.x();
         float y = curr_point.y + i * step_size * gaze.y();
         Eigen::Vector3i next_coord = grid.getGridCoordinates(x, y, curr_point.z);
-        bool in_grid = grid_matrix(next_coord.x() + offset, next_coord.y() + offset);
-        bool not_visited = std::count(visited.begin(), visited.end(), next_coord) == 0;
-        if (not_visited && in_grid) {
+        // check if in wall
+        if(grid_matrix(next_coord.x() + offset, next_coord.y() + offset)) {
+            return false;
+        }
+        if (std::count(visited.begin(), visited.end(), next_coord) == 0) {
             next_point = pcl::PointXYZ(x, y, curr_point.z);
             visited.push_back(next_coord);
             return true;
@@ -531,7 +571,8 @@ bool Utils::CalculateNextGridPoint(const Eigen::Vector3f& gaze, const pcl::Voxel
     return false;
 }
 
-float Utils::CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ gaze_point){
+float Utils::CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ gaze_point, const pcl::visualization::PCLVisualizer::Ptr viewer){
+    viewer->addSphere(grid_point, 0.05, 0, 1, 0, "sphere" + std::to_string(grid_point.x) + std::to_string(grid_point.y));
     float dist = std::sqrt(std::pow(grid_point.x - gaze_point.x, 2) +
                                 std::pow(grid_point.y - gaze_point.y, 2));
     return dist > 10 ? 0 : std::exp(-0.43 * dist);
