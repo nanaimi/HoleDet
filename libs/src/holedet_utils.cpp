@@ -571,9 +571,44 @@ bool Utils::CalculateNextGridPoint(const Eigen::Vector3f& gaze, const pcl::Voxel
     return false;
 }
 
-float Utils::CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ gaze_point, const pcl::visualization::PCLVisualizer::Ptr viewer){
-    viewer->addSphere(grid_point, 0.05, 0, 1, 0, "sphere" + std::to_string(grid_point.x) + std::to_string(grid_point.y));
+float Utils::CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ gaze_point){
     float dist = std::sqrt(std::pow(grid_point.x - gaze_point.x, 2) +
                                 std::pow(grid_point.y - gaze_point.y, 2));
     return dist > 10 ? 0 : std::exp(-0.43 * dist);
+}
+
+Eigen::MatrixXf Utils::CalcGazeScores(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> trajectories,
+                                      std::vector<std::vector<Eigen::Vector3f>> gazes,
+                                      const Eigen::MatrixXf& grid_matrix,
+                                      pcl::VoxelGrid<pcl::PointXYZ> grid,
+                                      const pcl::visualization::PCLVisualizer::Ptr viewer,
+                                      int offset) {
+    int rows = grid_matrix.rows();
+    int cols = grid_matrix.cols();
+    Eigen::MatrixXf scores = Eigen::MatrixXf::Zero(rows, cols);
+
+    for(int i = 0; i < gazes.size(); i++) {
+        for(int it = 0; it < gazes[i].size(); it++) {
+            pcl::PointXYZ last_point = trajectories[i]->points[it];
+            pcl::PointXYZ next_point = last_point;
+            std::vector<Eigen::Vector3i> visited;
+            while(Utils::CalculateNextGridPoint(gazes[i][it], grid, last_point, visited, next_point, grid_matrix)) {
+                float score = Utils::CalculateScoreFromDistance(next_point, trajectories[i]->points[it]);
+                last_point = next_point;
+                Eigen::Vector3i coords = grid.getGridCoordinates(next_point.x, next_point.y, next_point.z);
+                if(i == 22 && it == 1){
+                    viewer->addSphere(next_point, 0.05, 0, 1, 0, "sp" + std::to_string(i) + std::to_string(it) + std::to_string(score));
+                    if(next_point.x == -9.08897)
+                    cout << "x\t" << coords.x() << "\ty\t" << coords.y() << "\n";
+                }
+
+                if(coords.x() <= -500 || coords.y() <= -500) {
+                    return scores;
+                }
+                scores(coords.x() + offset, coords.y() + offset) += score;
+            }
+        }
+    }
+
+    return scores;
 }

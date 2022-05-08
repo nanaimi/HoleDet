@@ -175,7 +175,14 @@ class Utils {
                                                   int offset=500,
                                                   float step_size=0.01);
 
-    static float CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ gaze_point, const pcl::visualization::PCLVisualizer::Ptr viewer);
+    static float CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ gaze_point);
+
+    static Eigen::MatrixXf CalcGazeScores(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> trajectories,
+                                          std::vector<std::vector<Eigen::Vector3f>> gazes,
+                                          const Eigen::MatrixXf& grid_matrix,
+                                          pcl::VoxelGrid<pcl::PointXYZ>,
+                                          const pcl::visualization::PCLVisualizer::Ptr viewer,
+                                          int offset=500);
 };
 #endif //HOLEDET_HOLEDET_UTILS_H
 

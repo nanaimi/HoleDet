@@ -103,16 +103,7 @@ void HoleDetector::DetectHoles() {
     Eigen::MatrixXf grid_matrix(1000,1000);
     grid_matrix = Eigen::MatrixXf::Zero(1000,1000);
     Utils::CreateGrid(dense_floorplan_, grid, grid_matrix);
-
-    PointXYZ last_point = trajectories_[0]->points[0];
-    PointXYZ next_point = last_point;
-    std::vector<Eigen::Vector3i> visited;
-    while(Utils::CalculateNextGridPoint(gazes_[0][0], grid, last_point, visited, next_point, grid_matrix)) {
-        float score = Utils::CalculateScoreFromDistance(next_point, trajectories_[0]->points[0], viewer_);
-        last_point = next_point;
-        auto coord = grid.getGridCoordinates(next_point.x, next_point.y, next_point.z);
-        cout << "x\t" << coord.x() << "\ty\t" << coord.y() << "\tscore\t" << score << "\n";
-    }
+    Eigen::MatrixXf scores_matrix = Utils::CalcGazeScores(trajectories_, gazes_, grid_matrix, grid, viewer_);
 
 
     // Utils::CombinePointClouds(hull_cloud_, dense_floorplan_);
