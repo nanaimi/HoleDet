@@ -14,6 +14,7 @@ HoleDetector::HoleDetector(const basic_string<char> &path, const basic_string<ch
         filtered_cloud_(new PointCloud<PointXYZ>),
         floor_(new PointCloud<PointXYZ>),
         floor_projected_(new PointCloud<PointXYZ>),
+        floorplan_filtered_(new PointCloud<PointXYZ>),
         hull_cloud_(new PointCloud<PointXYZ>),
         hole_hull_cloud_(new PointCloud<pcl::PointXYZ>),
         interior_boundaries_(new PointCloud<PointXYZ>),
@@ -22,7 +23,8 @@ HoleDetector::HoleDetector(const basic_string<char> &path, const basic_string<ch
         viewer_ (new visualization::PCLVisualizer ("3D Viewer")),
         floor_coefficients_ (new ModelCoefficients),
         floor_normals_(new pcl::PointCloud<pcl::Normal>),
-        boundary_normals_(new pcl::PointCloud<pcl::Normal>)
+        boundary_normals_(new pcl::PointCloud<pcl::Normal>),
+        hole_index_(0)
 {
     path_ = path;
     config_file_ = config_filename;
@@ -62,11 +64,6 @@ void HoleDetector::ReadYAML() {
         kMaxIteration_ = config["parameters"]["max_iteration"].as<int>();
         kMaxTranslation_ = config["parameters"]["max_translation"].as<int>();
         kMaxAngle_ = config["parameters"]["max_angle"].as<int>(); // [deg]
-
-        kPassXLimMin_ = config["parameters"]["pass_xlim_min"].as<double>();
-        kPassXLimMax_ = config["parameters"]["pass_xlim_max"].as<double>();
-        kPassYLimMin_ = config["parameters"]["pass_ylim_min"].as<double>();
-        kPassYLimMax_ = config["parameters"]["pass_ylim_max"].as<double>();
 
         boundary_search_radius_ = config["parameters"]["boundary_search_radius"].as<float>();
         angle_thresh_ = config["parameters"]["angle_thresh"].as<float>();
@@ -200,7 +197,14 @@ void HoleDetector::Visualize() {
     viewer_ ->addPointCloud(dense_floorplan_, "dense_floor");
     viewer_->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
                                                1.0f, 0.0f, 0.0f, "dense_floor");
-    viewer_->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 1, "dense_floor");
+    viewer_->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 3, "dense_floor");
+
+//    viewer_ ->addPointCloud(floorplan_filtered_, "floorplan_filtered");
+//    viewer_->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
+//                                               0.5f, 0.0f, 0.5f, "floorplan_filtered");
+//    viewer_->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "floorplan_filtered");
+
+//    viewer_ ->addPolygonMesh(full_mesh_, "full_mesh",0);
 
     viewer_ ->addPointCloud(interior_boundaries_, "interior_boundaries_");
     viewer_->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
@@ -284,6 +288,107 @@ void HoleDetector::GetFloorplanCloud(bool debug, string floorplan_path) {
 
 }
 
+void HoleDetector::GetFullMesh() {
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr full_cloud (new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr tmp_cloud (new pcl::PointCloud<pcl::PointXYZ>);
+
+    pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
+    kdtree.setInputCloud (floor_projected_);
+
+    float ceiling_height = 4;
+
+    float avg_nearest_dist = 0;
+    int count = 0;
+    // nr of nearest neighbours
+    int K = 2;
+    for (auto search_point : floor_projected_->points) {
+        std::vector<int> pointIdxKNNSearch(K);
+        std::vector<float> pointKNNSquaredDistance(K);
+
+        if ( kdtree.nearestKSearch (search_point, K, pointIdxKNNSearch, pointKNNSquaredDistance) > 0 )
+        {
+            count++;
+            avg_nearest_dist += pointKNNSquaredDistance[1];
+        }
+    }
+
+    // size of voxel cell
+    avg_nearest_dist = avg_nearest_dist / count;
+
+    std::cout << "avg nearest dist: " << avg_nearest_dist << std::endl;
+
+    // subsample the dense floorplan point-cloud and add to the full cloud
+    pcl::VoxelGrid<pcl::PointXYZ> sor;
+    sor.setInputCloud (dense_floorplan_);
+    sor.setLeafSize (avg_nearest_dist, avg_nearest_dist, avg_nearest_dist);
+    sor.filter (*tmp_cloud);
+
+    *full_cloud += *tmp_cloud;
+
+    // subsample the projected floorplan pointcloud
+    sor.setInputCloud (floor_projected_);
+    sor.setLeafSize (avg_nearest_dist, avg_nearest_dist, avg_nearest_dist);
+    sor.filter (*tmp_cloud);
+
+    *full_cloud += *tmp_cloud;
+    *full_cloud += *filtered_cloud_;
+
+    // remove all points that are higher than ceiling and lower than floor
+    tmp_cloud->clear();
+    pcl::PassThrough<pcl::PointXYZ> pass;
+    pass.setInputCloud (full_cloud);
+    pass.setFilterFieldName ("z");
+    pass.setFilterLimits (dense_floorplan_->points[0].z, ceiling_height);
+    //pass.setFilterLimitsNegative (true);
+    pass.filter (*tmp_cloud);
+
+    *full_cloud += *tmp_cloud;
+
+    const uint n = dense_floorplan_->width;
+    pcl::Vertices::Ptr verticesPtr (new pcl::Vertices);
+    std::vector<uint> vert_vec(n);
+    iota(vert_vec.begin(), vert_vec.end(), 0);
+    verticesPtr->vertices = vert_vec;
+    std::vector<pcl::Vertices> polygon;
+    polygon.push_back(*verticesPtr);
+
+    pcl::CropHull<pcl::PointXYZ> crop;
+    crop.setHullIndices(polygon);
+    crop.setDim(2);
+
+    crop.setHullCloud(dense_floorplan_);
+    crop.setInputCloud(full_cloud);
+    crop.filter(*full_cloud);
+
+    floorplan_filtered_ = full_cloud;
+
+    // Generate extra constraining points on the wall
+    tmp_cloud->clear();
+    for (auto point : dense_floorplan_->points) {
+        float res = 1;
+        int nr_iterations = ceiling_height / res;
+        for(int i = 1; i <= nr_iterations; i++) {
+            pcl::PointXYZ new_point;
+            new_point.x = point.x;
+            new_point.y = point.y;
+            new_point.z = point.z + i*res;
+            tmp_cloud->points.push_back(new_point);
+        }
+    }
+
+    *full_cloud += *tmp_cloud;
+
+    Utils::ConstructMesh(full_cloud, full_mesh_, kNormalSearchRadius_, kPoissonDepth_);
+
+    std::cout << "constructed mesh" << std::endl;
+
+}
+
+void HoleDetector::CalculateVerticalScores() {
+    Utils::ScoreVertical(holes_,floorplan_filtered_);
+}
+
 void HoleDetector::SetBoundarySearchRadius(const float value) {
     boundary_search_radius_ = value;
 }
@@ -333,8 +438,8 @@ void HoleDetector::KeyboardEventOccurred(const visualization::KeyboardEvent &eve
         cout << "i was pressed => increasing the boundary point search radius by 0.1" << endl;
         CalculateCentroids();
         Visualize();
-
     }
+
     if (event.getKeySym () == "r" && event.keyDown ()){
         event_viewer->removeAllShapes();
         event_viewer->removeAllPointClouds();
@@ -342,8 +447,61 @@ void HoleDetector::KeyboardEventOccurred(const visualization::KeyboardEvent &eve
         cout << "i was pressed => reducing the boundary point search radius by 0.1" << endl;
         CalculateCentroids();
         Visualize();
-
     }
+
+    if (event.getKeySym () == "m" && event.keyDown ()){
+        event_viewer->removeAllShapes();
+        event_viewer->removeAllPointClouds();
+        cout << "m was pressed => showing mesh" << endl;
+        Visualize();
+        viewer_ ->addPolygonMesh(full_mesh_, "full_mesh",0);
+    }
+
+    if (event.getKeySym () == "z" && event.keyDown ())
+    {
+
+
+        if (event_viewer->contains("hole")) {
+            cout << "n was pressed => cycling through to next hole" << endl;
+            event_viewer->removePointCloud("hole");
+
+            auto name = "hole_" + std::to_string(hole_index_);
+            float r1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+            float r3 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+
+            event_viewer->addPointCloud(holes_.at(hole_index_).points, name);
+            event_viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR, r1, 1 - r1, r3, name);
+            event_viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 5,name);
+
+            do {
+                if (hole_index_ < holes_.size() - 1) {
+                    hole_index_++;
+                } else {
+                    hole_index_=0;
+                }
+            } while (holes_.at(hole_index_).score < 4);
+
+            name = "hole_" + std::to_string(hole_index_);
+
+            event_viewer->removePointCloud(name);
+
+            event_viewer->addPointCloud(holes_.at(hole_index_).points, "hole");
+            event_viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR, 1.0f, 1.0f, 1.0f, "hole");
+            event_viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 5,"hole");
+            std::cout << "with score: " << holes_.at(hole_index_).score << " and variances x: " << holes_.at(hole_index_).cov_matrix(0,0) << " y: " << holes_.at(hole_index_).cov_matrix(1,1) << " z: " << holes_.at(hole_index_).cov_matrix(2,2) << std::endl;
+        } else {
+
+            auto name = "hole_" + std::to_string(hole_index_);
+            event_viewer->removePointCloud(name);
+
+            event_viewer->addPointCloud(holes_.at(hole_index_).points, "hole");
+            event_viewer->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR, 1.0f, 1.0f, 1.0f, "hole");
+            event_viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 5,"hole");
+            std::cout << "with score: " << holes_.at(hole_index_).score << " and variances x: " << holes_.at(hole_index_).cov_matrix(0,0) << " y: " << holes_.at(hole_index_).cov_matrix(1,1) << " z: " << holes_.at(hole_index_).cov_matrix(2,2) << std::endl;
+        }
+    }
+
+
 }
 
 void HoleDetector::PointPickerCb(const visualization::PointPickingEvent &event, void *param) {

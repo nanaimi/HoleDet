@@ -384,8 +384,9 @@ void Utils::DenseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &floorplan,
                                   pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud,
                                   pcl::ModelCoefficients::Ptr coefficients) {
     bool first = true;
+    dense_cloud->clear();
     pcl::PointXYZ last_point = floorplan->points[0];
-    for (auto point : *floorplan) {
+    for (auto point : floorplan->points) {
         if (first) {
             first = false;
             continue;
@@ -429,10 +430,10 @@ void Utils::CombinePointClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr &source_cloud
     }
 }
 
-void Utils::ConstructMesh(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+void Utils::ConstructMesh(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
                           pcl::PolygonMesh & mesh,
                           const double normal_search_radius,
-                          const int poisson_depth) {
+                          const int poisson_depth ) {
     /* normal estimation using OMP */
     Eigen::Vector4f centroid;
     pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>());
@@ -463,6 +464,88 @@ void Utils::ConstructMesh(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
     poisson.setInputCloud(cloud_smoothed_normals);
     poisson.reconstruct(mesh);
     /* end poisson reconstruction */
+
+}
+
+
+bool Utils::GetHoleCovarianceMatrix(const pcl::PointCloud<pcl::PointXYZ>::Ptr crop_cloud,
+                                    const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+                                    Eigen::Matrix3f& cov_matrix) {
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr hole_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+
+    const uint n = crop_cloud->width;
+    pcl::Vertices::Ptr verticesPtr (new pcl::Vertices);
+    std::vector<uint> vert_vec(n);
+    iota(vert_vec.begin(), vert_vec.end(), 0);
+    verticesPtr->vertices = vert_vec;
+    std::vector<pcl::Vertices> polygon;
+    polygon.push_back(*verticesPtr);
+
+    pcl::CropHull<pcl::PointXYZ> crop;
+    crop.setHullIndices(polygon);
+    crop.setDim(2);
+
+    crop.setHullCloud(crop_cloud);
+    crop.setInputCloud(cloud);
+    crop.filter(*hole_cloud);
+
+    Eigen::MatrixXf hole_points(hole_cloud->width, 3);
+
+    for (int i = 0; i <  hole_cloud->width;  i++) {
+        hole_points.row(i)(0) = hole_cloud->points[i].x;
+        hole_points.row(i)(1) = hole_cloud->points[i].y;
+        hole_points.row(i)(2) = hole_cloud->points[i].z;
+    }
+
+    bool empty = false;
+    if (hole_points.rows() == 0) {
+        std::cout << "hole does not enclose any points" << std::endl;
+        empty = true;
+        return empty;
+    }
+
+    Eigen::MatrixXf centered = hole_points.rowwise() - hole_points.colwise().mean();
+    cov_matrix = (centered.adjoint() * centered) / float(hole_points.rows() - 1);
+
+    return empty;
+}
+
+
+void Utils::ScoreVertical(std::vector<Hole>& holes,
+                          const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
+    float THRESHOLD = 0.5; // TODO move to config
+
+    std::cout << "Nr of holes: " << holes.size() << std::endl;
+    for(auto& hole : holes) {
+        Eigen::Matrix3f cov_matrix = Eigen::MatrixXf::Zero(3,3);
+
+        bool empty = GetHoleCovarianceMatrix(hole.points, cloud, cov_matrix);
+        if (empty) {
+            hole.score -= 1;
+            hole.cov_matrix = Eigen::MatrixXf::Zero(3,3);
+            std::cout << hole.score << std::endl;
+            continue;
+        }
+
+        // Solve eigenvalue problem  for 3x3 Cov Matrix
+        Eigen::EigenSolver<Eigen::Matrix<float, 3,3> > s(cov_matrix);
+//        std::cout << cov_matrix << std::endl;
+//        std::cout << "eigenvalues:" << std::endl;
+//        std::cout << s.eigenvalues() << std::endl;
+//        std::cout << "eigenvectors=" << std::endl;
+//        std::cout << s.eigenvectors() << std::endl;
+
+        // Score holes
+        if (cov_matrix(2,2) < THRESHOLD) {
+            hole.score += 0;
+        } else {
+            hole.score -= 0.5;
+        }
+
+        hole.cov_matrix = cov_matrix;
+        std::cout << "with score: " << hole.score << " and variances x: " << cov_matrix(0,0) << " y: " << cov_matrix(1,1) << " z: " << cov_matrix(2,2) << std::endl;
+    }
 }
 
 void Utils::Calc2DNormals(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::Normal>::Ptr normals, float search_radius) {
