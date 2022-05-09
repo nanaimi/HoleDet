@@ -53,6 +53,8 @@
 
 #include <eigen3/Eigen/Eigenvalues>
 
+#include <eigen3/Eigen/Eigenvalues>
+
 struct Hole {
     pcl::PointXYZ centroid;
     pcl::PointCloud<pcl::PointXYZ>::Ptr points;
@@ -60,6 +62,7 @@ struct Hole {
     std::vector<Eigen::Affine3f> poses;
     float score;
     Eigen::Matrix3f cov_matrix;
+<<<<<<< HEAD
 };
 
 struct GazeScores {
@@ -68,6 +71,8 @@ struct GazeScores {
     int offset_x;
     int offset_y;
     pcl::VoxelGrid<pcl::PointXYZ> grid;
+=======
+>>>>>>> mesh construction function and vertical scoring taken into account
 };
 
 class Utils {
@@ -79,6 +84,7 @@ class Utils {
     static pcl::PointCloud<pcl::PointXYZ>::Ptr ReadCloud(const std::basic_string<char> &file_name,
                                                          pcl::PCDReader &reader);
 
+<<<<<<< HEAD
     static void ReadTrajectoriesAndGaze(const std::basic_string<char> &traj_file_name,
                                         const std::basic_string<char> &gaze_file_name,
                                         const std::basic_string<char> &lenghts_file_name,
@@ -86,6 +92,8 @@ class Utils {
                                         std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& trajectories,
                                         std::vector<std::vector<Eigen::Vector3f>>& gazes);
 
+=======
+>>>>>>> mesh construction function and vertical scoring taken into account
     ///
     /// \param cloud input point cloud
     /// \param floor cloud to which unprojected floor_ will be extracted
@@ -112,14 +120,24 @@ class Utils {
     /// \param interior_boundaries point cloud containing the interior boundary points
     static void GetInteriorBoundaries(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud,
                                       pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud,
+<<<<<<< HEAD
                                       pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries,
                                       pcl::PointCloud<pcl::Normal>::Ptr normals);
+=======
+                                      pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries);
+
+>>>>>>> mesh construction function and vertical scoring taken into account
     ///
     /// \param interior_boundaries point cloud containing the interior boundary points
     /// \param holes vector containing the point clouds for the individual holes
     /// \param hole_sizes number of points in each hole point cloud
     static void GetHoleClouds(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries,
+<<<<<<< HEAD
                               const float n_search_radius, pcl::PointCloud<pcl::Normal>::Ptr boundary_normals, const float angle_thresh);
+=======
+                              const float n_search_radius);
+
+>>>>>>> mesh construction function and vertical scoring taken into account
     ///
     /// \param holes vector containing the point clouds for the individual holes
     /// \param min_size minimum number of points in hole cloud required

@@ -22,8 +22,11 @@ HoleDetector::HoleDetector(const basic_string<char> &path, const basic_string<ch
         dense_floorplan_(new PointCloud<PointXYZ>),
         viewer_ (new visualization::PCLVisualizer ("3D Viewer")),
         floor_coefficients_ (new ModelCoefficients),
+<<<<<<< HEAD
         floor_normals_(new pcl::PointCloud<pcl::Normal>),
         boundary_normals_(new pcl::PointCloud<pcl::Normal>),
+=======
+>>>>>>> mesh construction function and vertical scoring taken into account
         hole_index_(0)
 {
     path_ = path;
@@ -96,6 +99,7 @@ void HoleDetector::PreProcess() {
 void HoleDetector::DetectHoles() {
     Utils::DenseFloorplanCloud(floorplan_, dense_floorplan_, floor_coefficients_);
     Utils::CreateConcaveHull(floor_projected_, hull_cloud_, hull_polygons_, chull_);
+<<<<<<< HEAD
 
      Utils::CombinePointClouds(hull_cloud_, dense_floorplan_);
      Utils::GetInteriorBoundaries(floor_projected_, dense_floorplan_, interior_boundaries_, floor_normals_);
@@ -158,6 +162,11 @@ void HoleDetector::GazeMap() {
         }
     }
 
+=======
+    Utils::CombinePointClouds(dense_floorplan_,hull_cloud_);
+    Utils::GetInteriorBoundaries(floor_projected_, dense_floorplan_, interior_boundaries_);
+    CalculateCentroids();
+>>>>>>> mesh construction function and vertical scoring taken into account
 }
 
 void HoleDetector::CalculateCentroids() {
@@ -203,6 +212,11 @@ void HoleDetector::Visualize() {
 //    viewer_->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
 //                                               0.5f, 0.0f, 0.5f, "floorplan_filtered");
 //    viewer_->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "floorplan_filtered");
+<<<<<<< HEAD
+=======
+
+//    viewer_ ->addPolygonMesh(full_mesh_, "full_mesh",0);
+>>>>>>> mesh construction function and vertical scoring taken into account
 
 //    viewer_ ->addPolygonMesh(full_mesh_, "full_mesh",0);
 
