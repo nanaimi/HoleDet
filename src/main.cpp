@@ -16,5 +16,5 @@ int main (int argc, char** argv)
     holeDetector.GetFloorplanCloud(true, data_path + "floorplan.pcd");
     holeDetector.DetectHoles();
     // holeDetector.CalculateScores();
-    holeDetector.Visualize();
+    // holeDetector.Visualize();
 }

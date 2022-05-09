@@ -42,6 +42,8 @@
 #include <opencv2/core/types.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/core/eigen.hpp>
+
 #include "Normal2dEstimation.h"
 
 
@@ -181,7 +183,6 @@ class Utils {
                                           std::vector<std::vector<Eigen::Vector3f>> gazes,
                                           const Eigen::MatrixXf& grid_matrix,
                                           pcl::VoxelGrid<pcl::PointXYZ>,
-                                          const pcl::visualization::PCLVisualizer::Ptr viewer,
                                           int offset=500);
 };
 #endif //HOLEDET_HOLEDET_UTILS_H

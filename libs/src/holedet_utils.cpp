@@ -504,9 +504,6 @@ void Utils::Grid(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
 }
 
 void Utils::CreateGrid(pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud, pcl::VoxelGrid<pcl::PointXYZ> grid, Eigen::MatrixXf &grid_matrix) {
-
-
-    /*
     pcl::PointXYZ max;
     pcl::PointXYZ min;
     pcl::CropBox<pcl::PointXYZ> crop;
@@ -534,18 +531,15 @@ void Utils::CreateGrid(pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud, pcl::Vo
 
         for(int it_x = coord_min.x(); it_x <= coord_max.x(); it_x++) {
             for(int it_y = coord_min.y(); it_y <= coord_max.y(); it_y++) {
-                if(it_x == 33 && it_y == 3) {
-                    std::cout << "Yes\n";
-                }
                 grid_matrix(it_x + 500, it_y + 500) = 1;
             }
         }
-    }*/
-
+    }
+    /*
     for (auto point : dense_cloud->points) {
         auto coords = grid.getGridCoordinates(point.x, point.y, point.z);
         grid_matrix(coords.x()+500, coords.y()+500) = 1;
-    }
+    }*/
 }
 
 bool Utils::CalculateNextGridPoint(const Eigen::Vector3f& gaze, const pcl::VoxelGrid<pcl::PointXYZ>& grid,
@@ -558,8 +552,8 @@ bool Utils::CalculateNextGridPoint(const Eigen::Vector3f& gaze, const pcl::Voxel
         float x = curr_point.x + i * step_size * gaze.x();
         float y = curr_point.y + i * step_size * gaze.y();
         Eigen::Vector3i next_coord = grid.getGridCoordinates(x, y, curr_point.z);
-        // check if in wall
-        if(grid_matrix(next_coord.x() + offset, next_coord.y() + offset)) {
+        // check if in space
+        if(!grid_matrix(next_coord.x() + offset, next_coord.y() + offset)) {
             return false;
         }
         if (std::count(visited.begin(), visited.end(), next_coord) == 0) {
@@ -581,13 +575,15 @@ Eigen::MatrixXf Utils::CalcGazeScores(std::vector<pcl::PointCloud<pcl::PointXYZ>
                                       std::vector<std::vector<Eigen::Vector3f>> gazes,
                                       const Eigen::MatrixXf& grid_matrix,
                                       pcl::VoxelGrid<pcl::PointXYZ> grid,
-                                      const pcl::visualization::PCLVisualizer::Ptr viewer,
                                       int offset) {
     int rows = grid_matrix.rows();
     int cols = grid_matrix.cols();
     Eigen::MatrixXf scores = Eigen::MatrixXf::Zero(rows, cols);
+    int n = gazes.size();
 
     for(int i = 0; i < gazes.size(); i++) {
+        std::cout << i+1 << " / " << n << "\r";
+        std::cout.flush();
         for(int it = 0; it < gazes[i].size(); it++) {
             pcl::PointXYZ last_point = trajectories[i]->points[it];
             pcl::PointXYZ next_point = last_point;
@@ -596,19 +592,14 @@ Eigen::MatrixXf Utils::CalcGazeScores(std::vector<pcl::PointCloud<pcl::PointXYZ>
                 float score = Utils::CalculateScoreFromDistance(next_point, trajectories[i]->points[it]);
                 last_point = next_point;
                 Eigen::Vector3i coords = grid.getGridCoordinates(next_point.x, next_point.y, next_point.z);
-                if(i == 22 && it == 1){
-                    viewer->addSphere(next_point, 0.05, 0, 1, 0, "sp" + std::to_string(i) + std::to_string(it) + std::to_string(score));
-                    if(next_point.x == -9.08897)
-                    cout << "x\t" << coords.x() << "\ty\t" << coords.y() << "\n";
-                }
 
-                if(coords.x() <= -500 || coords.y() <= -500) {
-                    return scores;
+                if(score == 0.0 || coords.x() <= -offset || coords.y() <= -offset) {
+                    break;
                 }
                 scores(coords.x() + offset, coords.y() + offset) += score;
             }
         }
     }
-
+    std::cout << "done" << std::endl;
     return scores;
 }
