@@ -490,7 +490,7 @@ void Utils::CalcPoses(std::vector<Hole> &holes) {
         pose.rotate(Eigen::AngleAxisf(atan2(vec(1),vec(0)), Eigen::Vector3f(0,0,1)));
         pose.rotate(Eigen::AngleAxisf(atan2(vec(2),sqrt(vec(0)*vec(0)+vec(1)*vec(1))), Eigen::Vector3f(0,1,0)));
 
-        holes[i].poses = pose;
+        holes[i].poses.push_back(pose);
     }
 }
 

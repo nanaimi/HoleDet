@@ -220,9 +220,14 @@ void HoleDetector::Visualize() {
         viewer_->addSphere(holes_[i].centroid, 0.3, r1, 1 - r1, r3, center_name);
 
         //Handle poses visualisation
-        pcl::PointXYZ p(holes_[i].poses.translation().x(), holes_[i].poses.translation().y(), holes_[i].poses.translation().z());
-        viewer_->addSphere(p,0.1,r1,1 - r1,r3, center_name + "_pose"); //add colour sphere to pose
-        viewer_->addCoordinateSystem(0.5, holes_[i].poses); //display pose
+        for (int j = 0; j < holes_[i].poses.size(); j++) {
+            pcl::PointXYZ p(holes_[i].poses[j].translation().x(),
+                            holes_[i].poses[j].translation().y(),
+                            holes_[i].poses[j].translation().z());
+            viewer_->addSphere(p, 0.1, r1, 1 - r1, r3, center_name + "_pose"); //add colour sphere to pose
+            viewer_->addCoordinateSystem(0.5, holes_[i].poses[j]); //display pose
+        }
+
     }
 
     // Utils::DrawGazesInCloud(trajectories_, gazes_, viewer_);
