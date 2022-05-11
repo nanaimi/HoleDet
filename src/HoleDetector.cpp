@@ -100,7 +100,14 @@ void HoleDetector::DetectHoles() {
     Utils::DenseFloorplanCloud(floorplan_, dense_floorplan_, floor_coefficients_);
     Utils::CreateConcaveHull(floor_projected_, hull_cloud_, hull_polygons_, chull_);
 
-    /* NEW PIPELINE */
+     Utils::CombinePointClouds(hull_cloud_, dense_floorplan_);
+     Utils::GetInteriorBoundaries(floor_projected_, dense_floorplan_, interior_boundaries_, floor_normals_);
+     Utils::Calc2DNormals(interior_boundaries_, boundary_normals_, boundary_search_radius_);
+     CalculateCentroids();
+     Utils::CalcPoses(holes_);
+}
+
+void HoleDetector::GazeMap() {
     Utils::CreateGrid(dense_floorplan_, gaze_scores_);
     Utils::CalcGazeScores(gaze_scores_,trajectories_, gazes_);
     Eigen::MatrixXf all = gaze_scores_.scores[0] + gaze_scores_.scores[1] +gaze_scores_.scores[2]+gaze_scores_.scores[3];
@@ -122,6 +129,25 @@ void HoleDetector::DetectHoles() {
         scores_img.convertTo(scores_img, CV_8U, 255);
         cv::applyColorMap(scores_img, heatmap, cv::COLORMAP_JET);
 
+        for (int j = 0; j < holes_.size(); j++) {
+            if (holes_[i].score < min_score_) { continue; }
+            for (auto point: *holes_[j].points) {
+                auto coords = gaze_scores_.grid.getGridCoordinates(point.x, point.y, point.z);
+                auto px = gaze_scores_.offset_x + coords.x();
+                auto py = gaze_scores_.offset_y + coords.y();
+                cv::Vec3b & color = heatmap.at<cv::Vec3b>(px,py);
+                color[0] = 0;
+                color[1] = 0;
+                color[2] = 255;
+            }
+            auto centroid = holes_[j].centroid;
+            auto coords = gaze_scores_.grid.getGridCoordinates(centroid.x, centroid.y, centroid.z);
+            auto px = gaze_scores_.offset_x + coords.x();
+            auto py = gaze_scores_.offset_y + coords.y();
+            cv::circle(heatmap, cv::Point(py, px), 2, cv::Scalar( 255, 0, 255 ),cv::FILLED);
+
+        }
+
         cv::Mat resized;
         cv::resize(heatmap, resized, cv::Size(heatmap.cols*2, heatmap.rows*2));
         std::string fname = std::to_string(i) + ".jpg";
@@ -135,12 +161,6 @@ void HoleDetector::DetectHoles() {
         }
     }
 
-
-    // Utils::CombinePointClouds(hull_cloud_, dense_floorplan_);
-    // Utils::GetInteriorBoundaries(floor_projected_, dense_floorplan_, interior_boundaries_, floor_normals_);
-    // Utils::Calc2DNormals(interior_boundaries_, boundary_normals_, boundary_search_radius_);
-    // CalculateCentroids();
-    // Utils::CalcPoses(holes_);
 }
 
 void HoleDetector::CalculateCentroids() {
@@ -171,7 +191,7 @@ void HoleDetector::Visualize() {
     viewer_->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
                                       0.0f, 0.2f, 0.8f, "floor_projected_");
     viewer_->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "floor_projected_");
-    /*
+
     viewer_->addPointCloud(floorplan_, "floorplan");
     viewer_->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
                                                0.5f, 0.0f, 0.5f, "floorplan");
@@ -203,7 +223,7 @@ void HoleDetector::Visualize() {
         pcl::PointXYZ p(holes_[i].poses.translation().x(), holes_[i].poses.translation().y(), holes_[i].poses.translation().z());
         viewer_->addSphere(p,0.1,r1,1 - r1,r3, center_name + "_pose"); //add colour sphere to pose
         viewer_->addCoordinateSystem(0.5, holes_[i].poses); //display pose
-    }*/
+    }
 
     // Utils::DrawGazesInCloud(trajectories_, gazes_, viewer_);
     pcl::PointXYZ p1 = trajectories_[0]->points[0];

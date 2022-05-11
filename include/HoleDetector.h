@@ -29,6 +29,7 @@ public:
     void DetectHoles();
     void GetFloorplanCloud(bool debug, string floorplan_path);
     void CalculateScores();
+    void GazeMap();
     void Visualize();
     void SetBoundarySearchRadius(const float value);
 
