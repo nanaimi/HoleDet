@@ -191,7 +191,8 @@ class Utils {
 
     static void CalcGazeScores(GazeScores &gaze_scores,
                                std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> trajectories,
-                               std::vector<std::vector<Eigen::Vector3f>> gazes);
+                               std::vector<std::vector<Eigen::Vector3f>> gazes,
+                               int num_of_angles=7);
 };
 #endif //HOLEDET_HOLEDET_UTILS_H
 

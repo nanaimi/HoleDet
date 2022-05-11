@@ -566,8 +566,9 @@ float Utils::CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ 
 }
 
 void Utils::CalcGazeScores(GazeScores &gaze_scores,
-                                 std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> trajectories,
-                                 std::vector<std::vector<Eigen::Vector3f>> gazes) {
+                           std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> trajectories,
+                           std::vector<std::vector<Eigen::Vector3f>> gazes,
+                           int num_of_angles) {
     int rows = gaze_scores.occupancy_grid.rows();
     int cols = gaze_scores.occupancy_grid.cols();
     gaze_scores.scores[0] = Eigen::MatrixXf::Zero(rows, cols);
@@ -575,41 +576,50 @@ void Utils::CalcGazeScores(GazeScores &gaze_scores,
     gaze_scores.scores[2] = Eigen::MatrixXf::Zero(rows, cols);
     gaze_scores.scores[3] = Eigen::MatrixXf::Zero(rows, cols);
 
-    int n = gazes.size();
+    uint n = gazes.size();
 
     for(int i = 0; i < n; i++) {
         std::cout << i+1 << " / " << n << "\r";
         std::cout.flush();
         for(int it = 0; it < gazes[i].size(); it++) {
-            pcl::PointXYZ last_point = trajectories[i]->points[it];
-            pcl::PointXYZ next_point = last_point;
-            std::vector<Eigen::Vector3i> visited;
-            visited.push_back(gaze_scores.grid.getGridCoordinates(last_point.x, last_point.y, last_point.z)); // ignore starting grid cell
+            for(int angle_it = -num_of_angles / 2; angle_it < num_of_angles / 2; angle_it++){
+                Eigen::Vector3f curr_gaze = gazes[i][it];
+                double angle = angle_it * 70.0 / (num_of_angles / 2.0);
+                Eigen::AngleAxis<float> transform(angle, Eigen::Vector3f(0,0,1));
+                curr_gaze = transform * curr_gaze;
 
-            while(Utils::CalculateNextGridPoint(gazes[i][it], gaze_scores, last_point,
-                                                visited,next_point)) {
-                float score = Utils::CalculateScoreFromDistance(next_point, trajectories[i]->points[it]);
-                Eigen::Vector3i last_coords = gaze_scores.grid.getGridCoordinates(last_point.x, last_point.y, last_point.z);
-                Eigen::Vector3i coords = gaze_scores.grid.getGridCoordinates(next_point.x, next_point.y, next_point.z);
-                last_point = next_point;
+                pcl::PointXYZ last_point = trajectories[i]->points[it];
+                pcl::PointXYZ next_point = last_point;
+                std::vector<Eigen::Vector3i> visited;
+                visited.push_back(gaze_scores.grid.getGridCoordinates(last_point.x, last_point.y, last_point.z)); // ignore starting grid cell
 
-                if(score == 0.0 || coords.x() <= -gaze_scores.offset_x || coords.y() <= -gaze_scores.offset_y) {
-                    break;
-                }
+                while(Utils::CalculateNextGridPoint(curr_gaze, gaze_scores, last_point,
+                                                    visited,next_point)) {
+                    float score = Utils::CalculateScoreFromDistance(next_point, trajectories[i]->points[it]);
+                    Eigen::Vector3i last_coords = gaze_scores.grid.getGridCoordinates(last_point.x, last_point.y,
+                                                                                      last_point.z);
+                    Eigen::Vector3i coords = gaze_scores.grid.getGridCoordinates(next_point.x, next_point.y,
+                                                                                 next_point.z);
+                    last_point = next_point;
 
-                // calculate change in coordinates
-                int diff_x = coords.x() - last_coords.x();
-                int diff_y = coords.y() - last_coords.y();
-                int x_idx = coords.x() + gaze_scores.offset_x;
-                int y_idx = coords.y() + gaze_scores.offset_y;
-                if(diff_x < 0){ // 270
-                    gaze_scores.scores[3](x_idx, y_idx) += score;
-                } else if(diff_x > 0) { // 90
-                    gaze_scores.scores[1](x_idx, y_idx) += score;
-                } else if(diff_y < 0) { // 0
-                    gaze_scores.scores[0](x_idx, y_idx) += score;
-                } else if(diff_y > 0) { // 180
-                    gaze_scores.scores[2](x_idx, y_idx) += score;
+                    if (score == 0.0 || coords.x() <= -gaze_scores.offset_x || coords.y() <= -gaze_scores.offset_y) {
+                        break;
+                    }
+
+                    // calculate change in coordinates
+                    int diff_x = coords.x() - last_coords.x();
+                    int diff_y = coords.y() - last_coords.y();
+                    int x_idx = coords.x() + gaze_scores.offset_x;
+                    int y_idx = coords.y() + gaze_scores.offset_y;
+                    if (diff_x < 0) { // 270
+                        gaze_scores.scores[3](x_idx, y_idx) += score;
+                    } else if (diff_x > 0) { // 90
+                        gaze_scores.scores[1](x_idx, y_idx) += score;
+                    } else if (diff_y < 0) { // 0
+                        gaze_scores.scores[0](x_idx, y_idx) += score;
+                    } else if (diff_y > 0) { // 180
+                        gaze_scores.scores[2](x_idx, y_idx) += score;
+                    }
                 }
             }
         }
