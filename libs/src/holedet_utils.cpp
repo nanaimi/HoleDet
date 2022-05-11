@@ -595,35 +595,57 @@ float Utils::CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ 
     return dist > 10 ? 0 : std::exp(-0.43 * dist);
 }
 
-Eigen::MatrixXf Utils::CalcGazeScores(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> trajectories,
+GazeScores Utils::CalcGazeScores(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> trajectories,
                                       std::vector<std::vector<Eigen::Vector3f>> gazes,
                                       const Eigen::MatrixXf& grid_matrix,
                                       pcl::VoxelGrid<pcl::PointXYZ> grid,
                                       int offset) {
     int rows = grid_matrix.rows();
     int cols = grid_matrix.cols();
-    Eigen::MatrixXf scores = Eigen::MatrixXf::Zero(rows, cols);
+    GazeScores gaze_scores;
+    gaze_scores.scores[0] = Eigen::MatrixXf::Zero(rows, cols);
+    gaze_scores.scores[1] = Eigen::MatrixXf::Zero(rows, cols);
+    gaze_scores.scores[2] = Eigen::MatrixXf::Zero(rows, cols);
+    gaze_scores.scores[3] = Eigen::MatrixXf::Zero(rows, cols);
+
     int n = gazes.size();
 
-    for(int i = 0; i < gazes.size(); i++) {
+    for(int i = 0; i < n; i++) {
         std::cout << i+1 << " / " << n << "\r";
         std::cout.flush();
         for(int it = 0; it < gazes[i].size(); it++) {
             pcl::PointXYZ last_point = trajectories[i]->points[it];
             pcl::PointXYZ next_point = last_point;
             std::vector<Eigen::Vector3i> visited;
-            while(Utils::CalculateNextGridPoint(gazes[i][it], grid, last_point, visited, next_point, grid_matrix)) {
+            visited.push_back(grid.getGridCoordinates(last_point.x, last_point.y, last_point.z)); // ignore starting grid cell
+
+            while(Utils::CalculateNextGridPoint(gazes[i][it], grid, last_point, visited,
+                                                next_point, grid_matrix)) {
                 float score = Utils::CalculateScoreFromDistance(next_point, trajectories[i]->points[it]);
-                last_point = next_point;
+                Eigen::Vector3i last_coords = grid.getGridCoordinates(last_point.x, last_point.y, last_point.z);
                 Eigen::Vector3i coords = grid.getGridCoordinates(next_point.x, next_point.y, next_point.z);
+                last_point = next_point;
 
                 if(score == 0.0 || coords.x() <= -offset || coords.y() <= -offset) {
                     break;
                 }
-                scores(coords.x() + offset, coords.y() + offset) += score;
+
+                // calculate change in coordinates
+                int diff_x = coords.x() - last_coords.x();
+                int diff_y = coords.y() - last_coords.y();
+
+                if(diff_x < 0){ // 270
+                    gaze_scores.scores[3](coords.x() + offset, coords.y() + offset) += score;
+                } else if(diff_x > 0) { // 90
+                    gaze_scores.scores[1](coords.x() + offset, coords.y() + offset) += score;
+                } else if(diff_y < 0) { // 0
+                    gaze_scores.scores[0](coords.x() + offset, coords.y() + offset) += score;
+                } else if(diff_y > 0) { // 180
+                    gaze_scores.scores[2](coords.x() + offset, coords.y() + offset) += score;
+                }
             }
         }
     }
     std::cout << "done" << std::endl;
-    return scores;
+    return gaze_scores;
 }
