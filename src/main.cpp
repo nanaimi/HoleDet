@@ -17,4 +17,5 @@ int main (int argc, char** argv)
     holeDetector.DetectHoles();
     holeDetector.CalculateScores();
     holeDetector.Visualize();
+    holeDetector.GazeMap();
 }

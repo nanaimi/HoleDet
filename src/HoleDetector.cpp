@@ -33,6 +33,8 @@ HoleDetector::HoleDetector(const basic_string<char> &path, const basic_string<ch
 
     InitFilters();
     raw_cloud_ = Utils::ReadCloud(pointcloud_file_, reader);
+    Utils::ReadTrajectoriesAndGaze(trajectory_file_, gaze_file_,
+                                        lengths_file_, reader, trajectories_, gazes_);
     PreProcess();
     Utils::ExtractAndProjectFloor(filtered_cloud_, floor_, floor_projected_,
                                         floor_coefficients_);
@@ -45,6 +47,8 @@ void HoleDetector::ReadYAML() {
         std::cout << "loading" << std::endl;
         pointcloud_file_ = path_ + config["input"]["cloud_file"].as<std::string>();
         trajectory_file_ = path_ + config["input"]["trajectory_file"].as<std::string>();
+        gaze_file_ = path_ + config["input"]["gaze_file"].as<std::string>();
+        lengths_file_ = path_ + config["input"]["lengths_file"].as<std::string>();
         floorplan_file_ = path_ + config["input"]["floorplan_file"].as<std::string>();
 
         kStartScore_ = config["parameters"]["start_score"].as<float>();
@@ -79,6 +83,8 @@ void HoleDetector::InitFilters() {
 
     voxel_filter_.setMinimumPointsNumberPerVoxel(2);
     voxel_filter_.setLeafSize (0.1, 0.1, 0.1);
+
+    gaze_scores_.grid.setLeafSize(0.1f, 0.1f, 0.1f);
 }
 
 void HoleDetector::PreProcess() {
@@ -93,11 +99,68 @@ void HoleDetector::PreProcess() {
 void HoleDetector::DetectHoles() {
     Utils::DenseFloorplanCloud(floorplan_, dense_floorplan_, floor_coefficients_);
     Utils::CreateConcaveHull(floor_projected_, hull_cloud_, hull_polygons_, chull_);
-    Utils::CombinePointClouds(hull_cloud_, dense_floorplan_);
-    Utils::GetInteriorBoundaries(floor_projected_, dense_floorplan_, interior_boundaries_, floor_normals_);
-    Utils::Calc2DNormals(interior_boundaries_, boundary_normals_, boundary_search_radius_);
-    CalculateCentroids();
-    Utils::CalcPoses(holes_);
+
+     Utils::CombinePointClouds(hull_cloud_, dense_floorplan_);
+     Utils::GetInteriorBoundaries(floor_projected_, dense_floorplan_, interior_boundaries_, floor_normals_);
+     Utils::Calc2DNormals(interior_boundaries_, boundary_normals_, boundary_search_radius_);
+     CalculateCentroids();
+     Utils::CalcPoses(holes_);
+}
+
+void HoleDetector::GazeMap() {
+    Utils::CreateGrid(dense_floorplan_, gaze_scores_);
+    Utils::CalcGazeScores(gaze_scores_,trajectories_, gazes_);
+    Eigen::MatrixXf all = gaze_scores_.scores[0] + gaze_scores_.scores[1] +gaze_scores_.scores[2]+gaze_scores_.scores[3];
+    for(int i = 0; i < 5; i++) {
+        cv::Mat scores_img;
+        cv::Mat heatmap;
+        if(i == 0) {
+            cv::eigen2cv(all, scores_img);
+        } else {
+            cv::eigen2cv(gaze_scores_.scores[i-1], scores_img);
+        }
+
+
+        double max;
+        cv::minMaxLoc(scores_img, NULL, &max, NULL, NULL);
+
+
+        scores_img = scores_img / max;
+        scores_img.convertTo(scores_img, CV_8U, 255);
+        cv::applyColorMap(scores_img, heatmap, cv::COLORMAP_JET);
+
+        for (int j = 0; j < holes_.size(); j++) {
+            if (holes_[i].score < min_score_) { continue; }
+            for (auto point: *holes_[j].points) {
+                auto coords = gaze_scores_.grid.getGridCoordinates(point.x, point.y, point.z);
+                auto px = gaze_scores_.offset_x + coords.x();
+                auto py = gaze_scores_.offset_y + coords.y();
+                cv::Vec3b & color = heatmap.at<cv::Vec3b>(px,py);
+                color[0] = 0;
+                color[1] = 0;
+                color[2] = 255;
+            }
+            auto centroid = holes_[j].centroid;
+            auto coords = gaze_scores_.grid.getGridCoordinates(centroid.x, centroid.y, centroid.z);
+            auto px = gaze_scores_.offset_x + coords.x();
+            auto py = gaze_scores_.offset_y + coords.y();
+            cv::circle(heatmap, cv::Point(py, px), 2, cv::Scalar( 255, 0, 255 ),cv::FILLED);
+
+        }
+
+        cv::Mat resized;
+        cv::resize(heatmap, resized, cv::Size(heatmap.cols*2, heatmap.rows*2));
+        std::string fname = std::to_string(i) + ".jpg";
+        imwrite(fname, resized);
+        while(true) {
+            cv::imshow("scores", resized);
+            if (cv::waitKey(10) == 27) {
+                cv::destroyAllWindows();
+                break;
+            }
+        }
+    }
+
 }
 
 void HoleDetector::CalculateCentroids() {
@@ -126,7 +189,7 @@ void HoleDetector::Visualize() {
 
     viewer_ ->addPointCloud(floor_projected_, "floor_projected_");
     viewer_->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
-                                               0.0f, 0.2f, 0.8f, "floor_projected_");
+                                      0.0f, 0.2f, 0.8f, "floor_projected_");
     viewer_->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "floor_projected_");
 
     viewer_->addPointCloud(floorplan_, "floorplan");
@@ -166,6 +229,11 @@ void HoleDetector::Visualize() {
         }
 
     }
+
+    // Utils::DrawGazesInCloud(trajectories_, gazes_, viewer_);
+    pcl::PointXYZ p1 = trajectories_[0]->points[0];
+    pcl::PointXYZ p2(p1.x + gazes_[0][0].x(), p1.y + gazes_[0][0].y(), p1.z + gazes_[0][0].z());
+    viewer_->addArrow(p2, p1, 1, 0, 0, false, "test_arrow");
 
     viewer_->registerPointPickingCallback(PpCallback, (void*)&viewer_);
     viewer_->registerKeyboardCallback (&HoleDetector::KeyboardEventOccurred, *this, (void*)&viewer_);

@@ -10,6 +10,50 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr Utils::ReadCloud(const std::basic_string<cha
     return cloud;
 }
 
+void Utils::ReadTrajectoriesAndGaze(const std::basic_string<char> &traj_file_name,
+                                    const std::basic_string<char> &gaze_file_name,
+                                    const std::basic_string<char> &lenghts_file_name,
+                                    pcl::PCDReader &reader,
+                                    std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& trajectories,
+                                    std::vector<std::vector<Eigen::Vector3f>>& gazes) {
+    pcl::PointCloud<pcl::PointXYZ>::Ptr trajectory = Utils::ReadCloud(traj_file_name, reader);
+
+    int max = 0;
+    int min = 0;
+    std::ifstream length_file(lenghts_file_name);
+    std::ifstream gaze_file(gaze_file_name);
+    std::string gaze;
+    std::string length;
+    std::vector<Eigen::Vector3f> all_gazes;
+
+    // decypher .obj file
+    while(std::getline(gaze_file, gaze)) {
+        if(gaze[0] == 'v') {
+            std::stringstream line(gaze.erase(0,2));
+            std::string segment;
+            std::vector<std::string> values;
+            while(std::getline(line, segment, ' ')) {
+                values.push_back(segment);
+            }
+            Eigen::Vector3f gaze_vec(stof(values[0]), stof(values[1]), stof(values[2]));
+            all_gazes.push_back(gaze_vec);
+        }
+    }
+
+    while(std::getline(length_file, length)) {
+        max += stoi(length);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr traj(new pcl::PointCloud<pcl::PointXYZ>);
+        std::vector<Eigen::Vector3f> curr_gazes;
+        for(int i = min; i < max; i++) {
+            traj->points.push_back(trajectory->points[i]);
+            curr_gazes.push_back(all_gazes[i]);
+        }
+        min = max;
+        trajectories.push_back(traj);
+        gazes.push_back(curr_gazes);
+    }
+}
+
 void Utils::ExtractAndProjectFloor(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
                                               pcl::PointCloud<pcl::PointXYZ>::Ptr floor,
                                               pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected,
@@ -202,6 +246,26 @@ void Utils::DrawLinesInCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
         cnt++;
     }
     viewer->addLine(cloud->points[0], last_point, 1.0, 0.0, 0.0, "line" + std::to_string(cnt));
+}
+
+void Utils::DrawGazesInCloud(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& trajectories,
+                             const std::vector<std::vector<Eigen::Vector3f>>& gazes,
+                             const pcl::visualization::PCLVisualizer::Ptr viewer) {
+    int n = trajectories.size();
+    for(int i = 0; i < n; i++) {
+        pcl::PointCloud<pcl::PointXYZ>::Ptr curr_traj = trajectories[i];
+        std::vector<Eigen::Vector3f> curr_gazes = gazes[i];
+        float r1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+        float r3 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+        std::string id_base = "arrow" + std::to_string(i);
+        for(int it = 0; it < curr_gazes.size(); it++) {
+            std::string id = id_base +  std::to_string(it);
+            std::cout << id << "\n";
+            pcl::PointXYZ p1 = curr_traj->points[it];
+            pcl::PointXYZ p2(p1.x + curr_gazes[it].x(), p1.y + curr_gazes[it].y(), p1.z + curr_gazes[it].z());
+            viewer->addArrow(p2, p1, r1, 1-r1, r3, false, id);
+        }
+    }
 }
 
 void Utils::TransformPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_in,
@@ -408,7 +472,7 @@ void Utils::Calc2DNormals(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointC
     norm_estim.setInputCloud(cloud);
     norm_estim.setSearchMethod (tree);
 
-    norm_estim.setRadiusSearch (0.6);
+    norm_estim.setRadiusSearch (search_radius);
 
     norm_estim.compute(normals);
 }
@@ -428,4 +492,137 @@ void Utils::CalcPoses(std::vector<Hole> &holes) {
 
         holes[i].poses.push_back(pose);
     }
+}
+
+void Utils::Grid(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
+    pcl::VoxelGrid<pcl::PointXYZ> grid;
+//    grid.setInputCloud(cloud);
+    grid.setLeafSize(0.1f, 0.1f, 0.1f);
+    auto coords = grid.getGridCoordinates(0,0,0);
+    coords = grid.getGridCoordinates(1,3,0);
+    coords = grid.getGridCoordinates(1,2,0);
+}
+
+void Utils::CreateGrid(pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud,
+                       GazeScores &gaze_scores) {
+    float res = gaze_scores.grid.getLeafSize()[0];
+    pcl::PointXYZ max;
+    pcl::PointXYZ min;
+    pcl::CropBox<pcl::PointXYZ> crop;
+    crop.setInputCloud(dense_cloud);
+    pcl::getMinMax3D(*dense_cloud, min, max);
+    int min_x = static_cast<int>(min.x-1);
+    int max_x = static_cast<int>(max.x + 1);
+    int min_y = static_cast<int>(min.y-1);
+    int max_y = static_cast<int>(max.y + 1);
+
+    auto height = static_cast<int>(std::ceil((max_x - min_x) / res));
+    auto width = static_cast<int>(std::ceil((max_y - min_y) / res));
+
+    gaze_scores.occupancy_grid = Eigen::MatrixXf::Zero(height,width);
+
+    gaze_scores.offset_x = std::abs(min_x/res);
+    gaze_scores.offset_y = std::abs(min_y/res);
+
+    for (auto point : dense_cloud->points) {
+        auto coords = gaze_scores.grid.getGridCoordinates(point.x, point.y, point.z);
+        auto px = gaze_scores.offset_x + coords.x();
+        auto py = gaze_scores.offset_y + coords.y();
+        gaze_scores.occupancy_grid(px, py) = 1;
+        gaze_scores.occupancy_grid(px, py-1) = 1;
+        gaze_scores.occupancy_grid(px, py+1) = 1;
+        gaze_scores.occupancy_grid(px-1, py) = 1;
+        gaze_scores.occupancy_grid(px+1, py) = 1;
+    }
+}
+
+bool Utils::CalculateNextGridPoint(const Eigen::Vector3f& gaze,
+                                   GazeScores gaze_scores,
+                                   pcl::PointXYZ curr_point,
+                                   std::vector<Eigen::Vector3i>& visited,
+                                   pcl::PointXYZ& next_point,
+                                   float step_size) {
+    for(int i = 0; i < 10 / step_size; i++) {
+        float x = curr_point.x + i * step_size * gaze.x();
+        float y = curr_point.y + i * step_size * gaze.y();
+        Eigen::Vector3i next_coord = gaze_scores.grid.getGridCoordinates(x, y, curr_point.z);
+        // check if in space
+        if(gaze_scores.occupancy_grid(next_coord.x() + gaze_scores.offset_x, next_coord.y() + gaze_scores.offset_y)) {
+            return false;
+        }
+        if (std::count(visited.begin(), visited.end(), next_coord) == 0) {
+            next_point = pcl::PointXYZ(x, y, curr_point.z);
+            visited.push_back(next_coord);
+            return true;
+        }
+    }
+    return false;
+}
+
+float Utils::CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ gaze_point){
+    float dist = std::sqrt(std::pow(grid_point.x - gaze_point.x, 2) +
+                                std::pow(grid_point.y - gaze_point.y, 2));
+    return dist > 10 ? 0 : std::exp(-0.43 * dist);
+}
+
+void Utils::CalcGazeScores(GazeScores &gaze_scores,
+                           std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> trajectories,
+                           std::vector<std::vector<Eigen::Vector3f>> gazes,
+                           int num_of_angles) {
+    int rows = gaze_scores.occupancy_grid.rows();
+    int cols = gaze_scores.occupancy_grid.cols();
+    gaze_scores.scores[0] = Eigen::MatrixXf::Zero(rows, cols);
+    gaze_scores.scores[1] = Eigen::MatrixXf::Zero(rows, cols);
+    gaze_scores.scores[2] = Eigen::MatrixXf::Zero(rows, cols);
+    gaze_scores.scores[3] = Eigen::MatrixXf::Zero(rows, cols);
+
+    uint n = gazes.size();
+
+    for(int i = 0; i < n; i++) {
+        std::cout << i+1 << " / " << n << "\r";
+        std::cout.flush();
+        for(int it = 0; it < gazes[i].size(); it++) {
+            for(int angle_it = -num_of_angles / 2; angle_it < num_of_angles / 2; angle_it++){
+                Eigen::Vector3f curr_gaze = gazes[i][it];
+                double angle = angle_it * 70.0 / (num_of_angles / 2.0);
+                Eigen::AngleAxis<float> transform(angle, Eigen::Vector3f(0,0,1));
+                curr_gaze = transform * curr_gaze;
+
+                pcl::PointXYZ last_point = trajectories[i]->points[it];
+                pcl::PointXYZ next_point = last_point;
+                std::vector<Eigen::Vector3i> visited;
+                visited.push_back(gaze_scores.grid.getGridCoordinates(last_point.x, last_point.y, last_point.z)); // ignore starting grid cell
+
+                while(Utils::CalculateNextGridPoint(curr_gaze, gaze_scores, last_point,
+                                                    visited,next_point)) {
+                    float score = Utils::CalculateScoreFromDistance(next_point, trajectories[i]->points[it]);
+                    Eigen::Vector3i last_coords = gaze_scores.grid.getGridCoordinates(last_point.x, last_point.y,
+                                                                                      last_point.z);
+                    Eigen::Vector3i coords = gaze_scores.grid.getGridCoordinates(next_point.x, next_point.y,
+                                                                                 next_point.z);
+                    last_point = next_point;
+
+                    if (score == 0.0 || coords.x() <= -gaze_scores.offset_x || coords.y() <= -gaze_scores.offset_y) {
+                        break;
+                    }
+
+                    // calculate change in coordinates
+                    int diff_x = coords.x() - last_coords.x();
+                    int diff_y = coords.y() - last_coords.y();
+                    int x_idx = coords.x() + gaze_scores.offset_x;
+                    int y_idx = coords.y() + gaze_scores.offset_y;
+                    if (diff_x < 0) { // 270
+                        gaze_scores.scores[3](x_idx, y_idx) += score;
+                    } else if (diff_x > 0) { // 90
+                        gaze_scores.scores[1](x_idx, y_idx) += score;
+                    } else if (diff_y < 0) { // 0
+                        gaze_scores.scores[0](x_idx, y_idx) += score;
+                    } else if (diff_y > 0) { // 180
+                        gaze_scores.scores[2](x_idx, y_idx) += score;
+                    }
+                }
+            }
+        }
+    }
+    std::cout << "done" << std::endl;
 }

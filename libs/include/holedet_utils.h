@@ -11,6 +11,7 @@
 #include <math.h>
 #include <string>
 #include <numeric>
+#include <fstream>
 
 #include <pcl/point_types.h>
 #include <pcl/io/pcd_io.h>
@@ -41,6 +42,9 @@
 #include <opencv2/core/types.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/core/eigen.hpp>
+#include <opencv2/core.hpp>
+
 #include "Normal2dEstimation.h"
 
 
@@ -52,6 +56,14 @@ struct Hole {
     float score;
 };
 
+struct GazeScores {
+    Eigen::MatrixXf scores[4]; //0:0 1:90 2:180, 3:270
+    Eigen::MatrixXf occupancy_grid;
+    int offset_x;
+    int offset_y;
+    pcl::VoxelGrid<pcl::PointXYZ> grid;
+};
+
 class Utils {
     public:
     ///
@@ -60,6 +72,14 @@ class Utils {
     /// \return shared pointer pcl::PointCloud<pcl::PointXYZ>::Ptr
     static pcl::PointCloud<pcl::PointXYZ>::Ptr ReadCloud(const std::basic_string<char> &file_name,
                                                          pcl::PCDReader &reader);
+
+    static void ReadTrajectoriesAndGaze(const std::basic_string<char> &traj_file_name,
+                                        const std::basic_string<char> &gaze_file_name,
+                                        const std::basic_string<char> &lenghts_file_name,
+                                        pcl::PCDReader &reader,
+                                        std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& trajectories,
+                                        std::vector<std::vector<Eigen::Vector3f>>& gazes);
+
     ///
     /// \param cloud input point cloud
     /// \param floor cloud to which unprojected floor_ will be extracted
@@ -113,6 +133,10 @@ class Utils {
     static void DrawLinesInCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
                                  const pcl::visualization::PCLVisualizer::Ptr viewer);
 
+    static void DrawGazesInCloud(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& trajectories,
+                                 const std::vector<std::vector<Eigen::Vector3f>>& gazes,
+                                 const pcl::visualization::PCLVisualizer::Ptr viewer);
+
     /// Computes the rigid transformation from the points in the floorplan and the points in the cloud and
     /// then aplies the transform to the floorplan cloud
     /// \param cloud_in The cloud containing the vertices of the floorplan
@@ -150,6 +174,25 @@ class Utils {
     static void Calc2DNormals(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::Normal>::Ptr normals, float search_radius);
 
     static void CalcPoses(std::vector<Hole> &holes);
+
+    static void Grid(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
+
+    static void CreateGrid(pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud,
+                           GazeScores &gaze_scores);
+
+    static bool CalculateNextGridPoint(const Eigen::Vector3f& gaze,
+                                       GazeScores gaze_scores,
+                                       pcl::PointXYZ curr_point,
+                                       std::vector<Eigen::Vector3i>& visited,
+                                       pcl::PointXYZ& next_point,
+                                       float step_size=0.01);
+
+    static float CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ gaze_point);
+
+    static void CalcGazeScores(GazeScores &gaze_scores,
+                               std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> trajectories,
+                               std::vector<std::vector<Eigen::Vector3f>> gazes,
+                               int num_of_angles=7);
 };
 #endif //HOLEDET_HOLEDET_UTILS_H
 
