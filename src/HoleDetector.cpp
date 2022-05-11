@@ -103,24 +103,25 @@ void HoleDetector::DetectHoles() {
     Eigen::MatrixXf grid_matrix(1000,1000);
     grid_matrix = Eigen::MatrixXf::Zero(1000,1000);
     Utils::CreateGrid(dense_floorplan_, grid, grid_matrix);
-    Eigen::MatrixXf scores_matrix = Utils::CalcGazeScores(trajectories_, gazes_, grid_matrix, grid);
-    cv::Mat scores_img;
-    cv::eigen2cv(scores_matrix, scores_img);
+    GazeScores scores_matrices = Utils::CalcGazeScores(trajectories_, gazes_, grid_matrix, grid);
+    for(int i = 0; i < 4; i++) {
+        cv::Mat scores_img;
+        cv::eigen2cv(scores_matrices.scores[i], scores_img);
 
-    double max;
-    cv::minMaxLoc(scores_img, NULL, &max, NULL, NULL);
+        double max;
+        cv::minMaxLoc(scores_img, NULL, &max, NULL, NULL);
 
-    scores_img = scores_img / max;
+        scores_img = scores_img / max;
 
-    cv::minMaxLoc(scores_img, NULL, &max, NULL, NULL);
-
-    while(true) {
-        cv::imshow("scores", scores_img);
-        if (cv::waitKey(10) == 27) {
-            cv::destroyAllWindows();
-            break;
+        while(true) {
+            cv::imshow("scores", scores_img);
+            if (cv::waitKey(10) == 27) {
+                cv::destroyAllWindows();
+                break;
+            }
         }
     }
+
 
     // Utils::CombinePointClouds(hull_cloud_, dense_floorplan_);
     // Utils::GetInteriorBoundaries(floor_projected_, dense_floorplan_, interior_boundaries_, floor_normals_);

@@ -56,6 +56,12 @@ struct Hole {
     float score;
 };
 
+struct GazeScores {
+    Eigen::MatrixXf scores[4]; //0:0 1:90 2:180, 3:270
+    Eigen::MatrixXf occupancy_grid;
+    int offset;
+};
+
 class Utils {
     public:
     ///
@@ -180,7 +186,7 @@ class Utils {
 
     static float CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ gaze_point);
 
-    static Eigen::MatrixXf CalcGazeScores(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> trajectories,
+    static GazeScores CalcGazeScores(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> trajectories,
                                           std::vector<std::vector<Eigen::Vector3f>> gazes,
                                           const Eigen::MatrixXf& grid_matrix,
                                           pcl::VoxelGrid<pcl::PointXYZ>,
