@@ -503,39 +503,9 @@ void Utils::Grid(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
     coords = grid.getGridCoordinates(1,2,0);
 }
 
-void Utils::CreateGrid(pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud, pcl::VoxelGrid<pcl::PointXYZ> grid, Eigen::MatrixXf &grid_matrix) {
-//    pcl::PointXYZ max;
-//    pcl::PointXYZ min;
-//    pcl::CropBox<pcl::PointXYZ> crop;
-//    crop.setInputCloud(dense_cloud);
-//    pcl::getMinMax3D(*dense_cloud, min, max);
-//    int min_x = static_cast<int>(min.x);
-//    int max_x = static_cast<int>(max.x + 1);
-//
-//    for(int i = min_x; i <= max_x; i++) {
-//        pcl::PointCloud<pcl::PointXYZ>::Ptr cropped_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-//        pcl::PointXYZ cropped_min;
-//        pcl::PointXYZ cropped_max;
-//        Eigen::Vector4f min_vec(i - 0.5, min.y, min.z, 1.0);
-//        Eigen::Vector4f max_vec(i + 0.5, max.y, max.z, 1.0);
-//        crop.setMin(min_vec);
-//        crop.setMax(max_vec);
-//        crop.filter(*cropped_cloud);
-//        if(cropped_cloud->width == 0) {
-//            continue;
-//        }
-//        pcl::getMinMax3D(*cropped_cloud, cropped_min, cropped_max);
-//
-//        Eigen::Vector3i coord_min = grid.getGridCoordinates(cropped_min.x, cropped_min.y, cropped_min.z);
-//        Eigen::Vector3i coord_max = grid.getGridCoordinates(cropped_max.x, cropped_max.y, cropped_max.z);
-//
-//        for(int it_x = coord_min.x(); it_x <= coord_max.x(); it_x++) {
-//            for(int it_y = coord_min.y(); it_y <= coord_max.y(); it_y++) {
-//                grid_matrix(it_x + 500, it_y + 500) = 1;
-//            }
-//        }
-//    }
-    float res = grid.getLeafSize()[0];
+void Utils::CreateGrid(pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud,
+                       GazeScores &gaze_scores) {
+    float res = gaze_scores.grid.getLeafSize()[0];
     pcl::PointXYZ max;
     pcl::PointXYZ min;
     pcl::CropBox<pcl::PointXYZ> crop;
@@ -549,35 +519,35 @@ void Utils::CreateGrid(pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud, pcl::Vo
     auto height = static_cast<int>(std::ceil((max_x - min_x) / res));
     auto width = static_cast<int>(std::ceil((max_y - min_y) / res));
 
-    grid_matrix = Eigen::MatrixXf::Zero(height,width);
+    gaze_scores.occupancy_grid = Eigen::MatrixXf::Zero(height,width);
 
-    float cx = std::abs(min_x/res);
-    float cy = std::abs(min_y/res);
+    gaze_scores.offset_x = std::abs(min_x/res);
+    gaze_scores.offset_y = std::abs(min_y/res);
 
     for (auto point : dense_cloud->points) {
-        auto coords = grid.getGridCoordinates(point.x, point.y, point.z);
-        auto px = static_cast<int>(cx + coords.x());
-        auto py = static_cast<int>(cy + coords.y());
-        grid_matrix(px, py) = 1;
-        grid_matrix(px, py-1) = 1;
-        grid_matrix(px, py+1) = 1;
-        grid_matrix(px-1, py) = 1;
-        grid_matrix(px+1, py) = 1;
+        auto coords = gaze_scores.grid.getGridCoordinates(point.x, point.y, point.z);
+        auto px = gaze_scores.offset_x + coords.x();
+        auto py = gaze_scores.offset_y + coords.y();
+        gaze_scores.occupancy_grid(px, py) = 1;
+        gaze_scores.occupancy_grid(px, py-1) = 1;
+        gaze_scores.occupancy_grid(px, py+1) = 1;
+        gaze_scores.occupancy_grid(px-1, py) = 1;
+        gaze_scores.occupancy_grid(px+1, py) = 1;
     }
 }
 
-bool Utils::CalculateNextGridPoint(const Eigen::Vector3f& gaze, const pcl::VoxelGrid<pcl::PointXYZ>& grid,
-                                              pcl::PointXYZ curr_point,
-                                              std::vector<Eigen::Vector3i>& visited,
-                                              pcl::PointXYZ& next_point,
-                                              Eigen::MatrixXf grid_matrix,
-                                              int offset, float step_size) {
+bool Utils::CalculateNextGridPoint(const Eigen::Vector3f& gaze,
+                                   GazeScores gaze_scores,
+                                   pcl::PointXYZ curr_point,
+                                   std::vector<Eigen::Vector3i>& visited,
+                                   pcl::PointXYZ& next_point,
+                                   float step_size) {
     for(int i = 0; i < 10 / step_size; i++) {
         float x = curr_point.x + i * step_size * gaze.x();
         float y = curr_point.y + i * step_size * gaze.y();
-        Eigen::Vector3i next_coord = grid.getGridCoordinates(x, y, curr_point.z);
+        Eigen::Vector3i next_coord = gaze_scores.grid.getGridCoordinates(x, y, curr_point.z);
         // check if in space
-        if(!grid_matrix(next_coord.x() + offset, next_coord.y() + offset)) {
+        if(gaze_scores.occupancy_grid(next_coord.x() + gaze_scores.offset_x, next_coord.y() + gaze_scores.offset_y)) {
             return false;
         }
         if (std::count(visited.begin(), visited.end(), next_coord) == 0) {
@@ -595,14 +565,11 @@ float Utils::CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ 
     return dist > 10 ? 0 : std::exp(-0.43 * dist);
 }
 
-GazeScores Utils::CalcGazeScores(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> trajectories,
-                                      std::vector<std::vector<Eigen::Vector3f>> gazes,
-                                      const Eigen::MatrixXf& grid_matrix,
-                                      pcl::VoxelGrid<pcl::PointXYZ> grid,
-                                      int offset) {
-    int rows = grid_matrix.rows();
-    int cols = grid_matrix.cols();
-    GazeScores gaze_scores;
+void Utils::CalcGazeScores(GazeScores &gaze_scores,
+                                 std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> trajectories,
+                                 std::vector<std::vector<Eigen::Vector3f>> gazes) {
+    int rows = gaze_scores.occupancy_grid.rows();
+    int cols = gaze_scores.occupancy_grid.cols();
     gaze_scores.scores[0] = Eigen::MatrixXf::Zero(rows, cols);
     gaze_scores.scores[1] = Eigen::MatrixXf::Zero(rows, cols);
     gaze_scores.scores[2] = Eigen::MatrixXf::Zero(rows, cols);
@@ -617,35 +584,35 @@ GazeScores Utils::CalcGazeScores(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr
             pcl::PointXYZ last_point = trajectories[i]->points[it];
             pcl::PointXYZ next_point = last_point;
             std::vector<Eigen::Vector3i> visited;
-            visited.push_back(grid.getGridCoordinates(last_point.x, last_point.y, last_point.z)); // ignore starting grid cell
+            visited.push_back(gaze_scores.grid.getGridCoordinates(last_point.x, last_point.y, last_point.z)); // ignore starting grid cell
 
-            while(Utils::CalculateNextGridPoint(gazes[i][it], grid, last_point, visited,
-                                                next_point, grid_matrix)) {
+            while(Utils::CalculateNextGridPoint(gazes[i][it], gaze_scores, last_point,
+                                                visited,next_point)) {
                 float score = Utils::CalculateScoreFromDistance(next_point, trajectories[i]->points[it]);
-                Eigen::Vector3i last_coords = grid.getGridCoordinates(last_point.x, last_point.y, last_point.z);
-                Eigen::Vector3i coords = grid.getGridCoordinates(next_point.x, next_point.y, next_point.z);
+                Eigen::Vector3i last_coords = gaze_scores.grid.getGridCoordinates(last_point.x, last_point.y, last_point.z);
+                Eigen::Vector3i coords = gaze_scores.grid.getGridCoordinates(next_point.x, next_point.y, next_point.z);
                 last_point = next_point;
 
-                if(score == 0.0 || coords.x() <= -offset || coords.y() <= -offset) {
+                if(score == 0.0 || coords.x() <= -gaze_scores.offset_x || coords.y() <= -gaze_scores.offset_y) {
                     break;
                 }
 
                 // calculate change in coordinates
                 int diff_x = coords.x() - last_coords.x();
                 int diff_y = coords.y() - last_coords.y();
-
+                int x_idx = coords.x() + gaze_scores.offset_x;
+                int y_idx = coords.y() + gaze_scores.offset_y;
                 if(diff_x < 0){ // 270
-                    gaze_scores.scores[3](coords.x() + offset, coords.y() + offset) += score;
+                    gaze_scores.scores[3](x_idx, y_idx) += score;
                 } else if(diff_x > 0) { // 90
-                    gaze_scores.scores[1](coords.x() + offset, coords.y() + offset) += score;
+                    gaze_scores.scores[1](x_idx, y_idx) += score;
                 } else if(diff_y < 0) { // 0
-                    gaze_scores.scores[0](coords.x() + offset, coords.y() + offset) += score;
+                    gaze_scores.scores[0](x_idx, y_idx) += score;
                 } else if(diff_y > 0) { // 180
-                    gaze_scores.scores[2](coords.x() + offset, coords.y() + offset) += score;
+                    gaze_scores.scores[2](x_idx, y_idx) += score;
                 }
             }
         }
     }
     std::cout << "done" << std::endl;
-    return gaze_scores;
 }

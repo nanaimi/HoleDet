@@ -83,6 +83,8 @@ void HoleDetector::InitFilters() {
 
     voxel_filter_.setMinimumPointsNumberPerVoxel(2);
     voxel_filter_.setLeafSize (0.1, 0.1, 0.1);
+
+    gaze_scores_.grid.setLeafSize(0.1f, 0.1f, 0.1f);
 }
 
 void HoleDetector::PreProcess() {
@@ -98,15 +100,13 @@ void HoleDetector::DetectHoles() {
     Utils::DenseFloorplanCloud(floorplan_, dense_floorplan_, floor_coefficients_);
     Utils::CreateConcaveHull(floor_projected_, hull_cloud_, hull_polygons_, chull_);
 
-    pcl::VoxelGrid<pcl::PointXYZ> grid;
-    grid.setLeafSize(0.1f, 0.1f, 0.1f);
-    Eigen::MatrixXf grid_matrix;
-    Utils::CreateGrid(dense_floorplan_, grid, grid_matrix);
+    /* NEW PIPELINE */
+    Utils::CreateGrid(dense_floorplan_, gaze_scores_);
+    Utils::CalcGazeScores(gaze_scores_,trajectories_, gazes_);
 
-    GazeScores scores_matrices = Utils::CalcGazeScores(trajectories_, gazes_, grid_matrix, grid);
     for(int i = 0; i < 4; i++) {
         cv::Mat scores_img;
-        cv::eigen2cv(scores_matrices.scores[i], scores_img);
+        cv::eigen2cv(gaze_scores_.scores[i], scores_img);
 
         double max;
         cv::minMaxLoc(scores_img, NULL, &max, NULL, NULL);

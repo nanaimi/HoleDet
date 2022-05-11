@@ -66,6 +66,8 @@ private:
     // vector of holes
     vector<Hole> holes_;
 
+    GazeScores gaze_scores_;
+
     // Point Picking
     MouseParams mp_;
     TransformPoints tp_;

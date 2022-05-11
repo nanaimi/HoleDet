@@ -59,7 +59,9 @@ struct Hole {
 struct GazeScores {
     Eigen::MatrixXf scores[4]; //0:0 1:90 2:180, 3:270
     Eigen::MatrixXf occupancy_grid;
-    int offset;
+    int offset_x;
+    int offset_y;
+    pcl::VoxelGrid<pcl::PointXYZ> grid;
 };
 
 class Utils {
@@ -175,22 +177,21 @@ class Utils {
 
     static void Grid(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
 
-    static void CreateGrid(pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud, pcl::VoxelGrid<pcl::PointXYZ> grid, Eigen::MatrixXf &grid_matrix);
+    static void CreateGrid(pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud,
+                           GazeScores &gaze_scores);
 
-    static bool CalculateNextGridPoint(const Eigen::Vector3f& gaze, const pcl::VoxelGrid<pcl::PointXYZ>& grid,
-                                                  pcl::PointXYZ curr_point, std::vector<Eigen::Vector3i>& visited,
-                                                  pcl::PointXYZ& next_point,
-                                                  Eigen::MatrixXf grid_matrix,
-                                                  int offset=500,
-                                                  float step_size=0.01);
+    static bool CalculateNextGridPoint(const Eigen::Vector3f& gaze,
+                                       GazeScores gaze_scores,
+                                       pcl::PointXYZ curr_point,
+                                       std::vector<Eigen::Vector3i>& visited,
+                                       pcl::PointXYZ& next_point,
+                                       float step_size=0.01);
 
     static float CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ gaze_point);
 
-    static GazeScores CalcGazeScores(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> trajectories,
-                                          std::vector<std::vector<Eigen::Vector3f>> gazes,
-                                          const Eigen::MatrixXf& grid_matrix,
-                                          pcl::VoxelGrid<pcl::PointXYZ>,
-                                          int offset=500);
+    static void CalcGazeScores(GazeScores &gaze_scores,
+                               std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> trajectories,
+                               std::vector<std::vector<Eigen::Vector3f>> gazes);
 };
 #endif //HOLEDET_HOLEDET_UTILS_H
 
