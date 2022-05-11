@@ -100,9 +100,9 @@ void HoleDetector::DetectHoles() {
 
     pcl::VoxelGrid<pcl::PointXYZ> grid;
     grid.setLeafSize(0.1f, 0.1f, 0.1f);
-    Eigen::MatrixXf grid_matrix(1000,1000);
-    grid_matrix = Eigen::MatrixXf::Zero(1000,1000);
+    Eigen::MatrixXf grid_matrix;
     Utils::CreateGrid(dense_floorplan_, grid, grid_matrix);
+
     GazeScores scores_matrices = Utils::CalcGazeScores(trajectories_, gazes_, grid_matrix, grid);
     for(int i = 0; i < 4; i++) {
         cv::Mat scores_img;
@@ -110,6 +110,7 @@ void HoleDetector::DetectHoles() {
 
         double max;
         cv::minMaxLoc(scores_img, NULL, &max, NULL, NULL);
+
 
         scores_img = scores_img / max;
 
