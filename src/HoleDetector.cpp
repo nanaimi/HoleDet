@@ -107,7 +107,12 @@ void HoleDetector::DetectHoles() {
     cv::Mat scores_img;
     cv::eigen2cv(scores_matrix, scores_img);
 
-    cv::normalize(scores_img, scores_img, 0, 255, cv::NORM_MINMAX);
+    double max;
+    cv::minMaxLoc(scores_img, NULL, &max, NULL, NULL);
+
+    scores_img = scores_img / max;
+
+    cv::minMaxLoc(scores_img, NULL, &max, NULL, NULL);
 
     while(true) {
         cv::imshow("scores", scores_img);
