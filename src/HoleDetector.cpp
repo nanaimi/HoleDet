@@ -107,10 +107,10 @@ void HoleDetector::DetectHoles() {
     for(int i = 0; i < 5; i++) {
         cv::Mat scores_img;
         cv::Mat heatmap;
-        if(i == 5) {
+        if(i == 0) {
             cv::eigen2cv(all, scores_img);
         } else {
-            cv::eigen2cv(gaze_scores_.scores[i], scores_img);
+            cv::eigen2cv(gaze_scores_.scores[i-1], scores_img);
         }
 
 
@@ -124,7 +124,8 @@ void HoleDetector::DetectHoles() {
 
         cv::Mat resized;
         cv::resize(heatmap, resized, cv::Size(heatmap.cols*2, heatmap.rows*2));
-
+        std::string fname = std::to_string(i) + ".jpg";
+        imwrite(fname, resized);
         while(true) {
             cv::imshow("scores", resized);
             if (cv::waitKey(10) == 27) {
