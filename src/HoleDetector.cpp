@@ -103,19 +103,30 @@ void HoleDetector::DetectHoles() {
     /* NEW PIPELINE */
     Utils::CreateGrid(dense_floorplan_, gaze_scores_);
     Utils::CalcGazeScores(gaze_scores_,trajectories_, gazes_);
-
-    for(int i = 0; i < 4; i++) {
+    Eigen::MatrixXf all = gaze_scores_.scores[0] + gaze_scores_.scores[1] +gaze_scores_.scores[2]+gaze_scores_.scores[3];
+    for(int i = 0; i < 5; i++) {
         cv::Mat scores_img;
-        cv::eigen2cv(gaze_scores_.scores[i], scores_img);
+        cv::Mat heatmap;
+        if(i == 5) {
+            cv::eigen2cv(all, scores_img);
+        } else {
+            cv::eigen2cv(gaze_scores_.scores[i], scores_img);
+        }
+
 
         double max;
         cv::minMaxLoc(scores_img, NULL, &max, NULL, NULL);
 
 
         scores_img = scores_img / max;
+        scores_img.convertTo(scores_img, CV_8U, 255);
+        cv::applyColorMap(scores_img, heatmap, cv::COLORMAP_JET);
+
+        cv::Mat resized;
+        cv::resize(heatmap, resized, cv::Size(heatmap.cols*2, heatmap.rows*2));
 
         while(true) {
-            cv::imshow("scores", scores_img);
+            cv::imshow("scores", resized);
             if (cv::waitKey(10) == 27) {
                 cv::destroyAllWindows();
                 break;
