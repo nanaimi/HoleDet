@@ -231,9 +231,6 @@ void HoleDetector::Visualize() {
     }
 
     // Utils::DrawGazesInCloud(trajectories_, gazes_, viewer_);
-    pcl::PointXYZ p1 = trajectories_[0]->points[0];
-    pcl::PointXYZ p2(p1.x + gazes_[0][0].x(), p1.y + gazes_[0][0].y(), p1.z + gazes_[0][0].z());
-    viewer_->addArrow(p2, p1, 1, 0, 0, false, "test_arrow");
 
     viewer_->registerPointPickingCallback(PpCallback, (void*)&viewer_);
     viewer_->registerKeyboardCallback (&HoleDetector::KeyboardEventOccurred, *this, (void*)&viewer_);
