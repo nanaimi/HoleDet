@@ -106,14 +106,15 @@ void HoleDetector::DetectHoles() {
 void HoleDetector::GazeMap() {
     Utils::CreateGrid(dense_floorplan_, gaze_scores_);
     Utils::CalcGazeScores(gaze_scores_,trajectories_, gazes_);
-    Eigen::MatrixXf all = gaze_scores_.scores[0] + gaze_scores_.scores[1] +gaze_scores_.scores[2]+gaze_scores_.scores[3];
+    gaze_scores_.scores = gaze_scores_.angle_scores[0] + gaze_scores_.angle_scores[1] +
+                            gaze_scores_.angle_scores[2] + gaze_scores_.angle_scores[3];
     for(int i = 0; i < 5; i++) {
         cv::Mat scores_img;
         cv::Mat heatmap;
         if(i == 0) {
-            cv::eigen2cv(all, scores_img);
+            cv::eigen2cv(gaze_scores_.scores, scores_img);
         } else {
-            cv::eigen2cv(gaze_scores_.scores[i-1], scores_img);
+            cv::eigen2cv(gaze_scores_.angle_scores[i - 1], scores_img);
         }
 
 
@@ -149,7 +150,7 @@ void HoleDetector::GazeMap() {
         std::string fname = std::to_string(i) + ".jpg";
         imwrite(fname, resized);
         while(true) {
-            cv::imshow("scores", resized);
+            cv::imshow("angle_scores", resized);
             if (cv::waitKey(10) == 27) {
                 cv::destroyAllWindows();
                 break;
@@ -170,7 +171,9 @@ void HoleDetector::CalculateCentroids() {
 void HoleDetector::CalculateScores() {
     /* Calculate A score based on the Area */
     Utils::CalcAreaScore(holes_, cvxhull_);
-    for (int i = 0; i < holes_.size(); i++) {
+    Utils::CalcHoleGazes(holes_, gaze_scores_);
+
+    for(int i = 0; i < holes_.size(); i++) {
         float score = holes_[i].score;
         std::string str_nmb = to_string(i);
         if (str_nmb.length() < 2) {

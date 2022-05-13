@@ -15,10 +15,11 @@ int main (int argc, char** argv)
 
     holeDetector.GetFloorplanCloud(true, data_path + "floorplan.pcd");
     holeDetector.DetectHoles();
+    holeDetector.GazeMap();
     holeDetector.CalculateScores();
     holeDetector.CalculatePoses();
     holeDetector.GetFullMesh();
     holeDetector.CalculateVerticalScores();
     holeDetector.Visualize();
-    holeDetector.GazeMap();
+
 }
