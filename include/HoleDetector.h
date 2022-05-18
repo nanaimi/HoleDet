@@ -32,6 +32,7 @@ public:
     void CalculateVerticalScores();
     void CalculateScores();
     void GazeMap();
+    void CalculatePoses();
     void Visualize();
     void SetBoundarySearchRadius(const float value);
 

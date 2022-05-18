@@ -101,7 +101,6 @@ void HoleDetector::DetectHoles() {
     Utils::GetInteriorBoundaries(floor_projected_, dense_floorplan_, interior_boundaries_, floor_normals_);
     Utils::Calc2DNormals(interior_boundaries_, boundary_normals_, boundary_search_radius_);
     CalculateCentroids();
-    Utils::CalcPoses(holes_);
 }
 
 void HoleDetector::GazeMap() {
@@ -181,6 +180,10 @@ void HoleDetector::CalculateScores() {
     }
 }
 
+void HoleDetector::CalculatePoses() {
+    Utils::CalcPoses(holes_, floor_projected_);
+}
+
 void HoleDetector::Visualize() {
 
     viewer_->addPointCloud(floor_projected_, "floor_projected_");
@@ -227,8 +230,12 @@ void HoleDetector::Visualize() {
             pcl::PointXYZ p(holes_[i].poses[j].translation().x(),
                             holes_[i].poses[j].translation().y(),
                             holes_[i].poses[j].translation().z());
-            viewer_->addSphere(p, 0.1, r1, 1 - r1, r3, center_name + "_pose"); //add colour sphere to pose
-            viewer_->addCoordinateSystem(0.5, holes_[i].poses[j]); //display pose
+            if(holes_[i].rotateds[j]){
+                viewer_->addSphere(p, 0.05, 255,255, 255,center_name + "_pose" + std::to_string(j)); //add colour sphere to pose
+            }else {
+                viewer_->addSphere(p, 0.05, r1, 1 - r1, r3,center_name + "_pose" + std::to_string(j)); //add colour sphere to pose
+            }
+            viewer_->addCoordinateSystem(0.2, holes_[i].poses[j]); //display pose
         }
 
     }
