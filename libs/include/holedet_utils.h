@@ -226,7 +226,6 @@ public:
     /// \param cloud;      the complete preprocessed point cloud
     static void ScoreVertical(std::vector<Hole> &holes,
                               const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
-                               int num_of_angles=7);
 
     static void CalcHoleGazes(std::vector<Hole> &holes, GazeScores gaze_scores, int patch_size=2);
 };
