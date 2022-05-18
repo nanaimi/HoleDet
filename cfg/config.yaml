@@ -1,24 +1,21 @@
 ---
 debug: false
 input:
-  cloud_file: /data/hololens.pcd
-  gaze_file: /data/gaze_directions.obj
-  trajectory_file: /data/trajectory.pcd
-  lengths_file: /data/trajectory_lengths.txt
-  floorplan_file: /data/floorplan.jpg
+  cloud_file:      data/hololens.pcd
+  gaze_file:       data/gaze_directions.obj
+  trajectory_file: data/trajectory.pcd
+  lengths_file:    data/trajectory_lengths.txt
+  floorplan_file:  data/floorplan.jpg
 parameters:
-  poisson_depth: 6
-  normal_search_radius: 0.5
-  outlier_radius: 3
+  poisson_depth:          7
+  normal_search_radius:   0.5
+  outlier_radius:         3
   outlier_min_neighbours: 10
-  image_resolution: 0.0694
-  max_iteration: 10000
-  max_translation: 5
-  max_angle: 10
-  pass_xlim_min: -13.0
-  pass_xlim_max: 24.0
-  pass_ylim_min: -15.0
-  pass_ylim_max: 25.0
-  start_score: 5.0
+  image_resolution:       0.0694
+  max_iteration:          10000
+  max_translation:        5
+  max_angle:              10
+  start_score:            5.0
   boundary_search_radius: 0.6
-  angle_thresh: 3
+  angle_thresh:           0.8
+  min_score:              3

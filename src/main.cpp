@@ -17,6 +17,8 @@ int main (int argc, char** argv)
     holeDetector.DetectHoles();
     holeDetector.CalculateScores();
     holeDetector.CalculatePoses();
+    holeDetector.GetFullMesh();
+    holeDetector.CalculateVerticalScores();
     holeDetector.Visualize();
     holeDetector.GazeMap();
 }
