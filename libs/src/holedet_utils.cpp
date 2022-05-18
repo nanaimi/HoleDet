@@ -492,6 +492,7 @@ void Utils::CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::
     passBack.setFilterFieldName ("x");
 
     for (int i = 0; i < holes.size(); ++i) {
+        std::vector<pcl::PointXYZ> visited;
         //Get boundary normals
         pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>);
         Calc2DNormals(holes[i].points, normals, 0.6);
@@ -510,10 +511,14 @@ void Utils::CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::
             pcl::PointXYZ boundary_point = holes[i].points->points[j];
 
             //Handle keypoint choice
-            bool skip = true;
-            if(j==0 || pcl::euclideanDistance(boundary_point, keypoint) > step_back){
-                skip = false;
-                keypoint = boundary_point;
+            bool skip = false;
+            if(j != 0) {
+                for(auto& visited_point : visited) {
+                    if(pcl::euclideanDistance(boundary_point, visited_point) < step_back) {
+                        skip = true;
+                        break;
+                    }
+                }
             }
 
             //Skip if not keypoint
@@ -556,7 +561,7 @@ void Utils::CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::
 
                 //Take a step back
                 pose.translate(Eigen::Vector3f(-step_back,0,0));
-
+                visited.push_back(boundary_point);
                 holes[i].poses.push_back(pose);
             }
         }
