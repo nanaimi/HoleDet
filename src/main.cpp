@@ -23,5 +23,4 @@ int main (int argc, char** argv)
     holeDetector.GetFullMesh();
     holeDetector.CalculateVerticalScores();
     holeDetector.Visualize();
-
 }
