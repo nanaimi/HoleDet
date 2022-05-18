@@ -1,5 +1,6 @@
 ---
-debug: false
+debug: true
+use_gaze: false
 input:
   cloud_file:      data/hololens.pcd
   gaze_file:       data/gaze_directions.obj

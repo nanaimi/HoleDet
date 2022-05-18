@@ -722,10 +722,10 @@ void Utils::CalcGazeScores(GazeScores &gaze_scores,
                            int num_of_angles) {
     int rows = gaze_scores.occupancy_grid.rows();
     int cols = gaze_scores.occupancy_grid.cols();
-    gaze_scores.scores[0] = Eigen::MatrixXf::Zero(rows, cols);
-    gaze_scores.scores[1] = Eigen::MatrixXf::Zero(rows, cols);
-    gaze_scores.scores[2] = Eigen::MatrixXf::Zero(rows, cols);
-    gaze_scores.scores[3] = Eigen::MatrixXf::Zero(rows, cols);
+    gaze_scores.angle_scores[0] = Eigen::MatrixXf::Zero(rows, cols);
+    gaze_scores.angle_scores[1] = Eigen::MatrixXf::Zero(rows, cols);
+    gaze_scores.angle_scores[2] = Eigen::MatrixXf::Zero(rows, cols);
+    gaze_scores.angle_scores[3] = Eigen::MatrixXf::Zero(rows, cols);
 
     uint n = gazes.size();
 
@@ -763,17 +763,45 @@ void Utils::CalcGazeScores(GazeScores &gaze_scores,
                     int x_idx = coords.x() + gaze_scores.offset_x;
                     int y_idx = coords.y() + gaze_scores.offset_y;
                     if (diff_x < 0) { // 270
-                        gaze_scores.scores[3](x_idx, y_idx) += score;
+                        gaze_scores.angle_scores[3](x_idx, y_idx) += score;
                     } else if (diff_x > 0) { // 90
-                        gaze_scores.scores[1](x_idx, y_idx) += score;
+                        gaze_scores.angle_scores[1](x_idx, y_idx) += score;
                     } else if (diff_y < 0) { // 0
-                        gaze_scores.scores[0](x_idx, y_idx) += score;
+                        gaze_scores.angle_scores[0](x_idx, y_idx) += score;
                     } else if (diff_y > 0) { // 180
-                        gaze_scores.scores[2](x_idx, y_idx) += score;
+                        gaze_scores.angle_scores[2](x_idx, y_idx) += score;
                     }
                 }
             }
         }
     }
     std::cout << "done" << std::endl;
+}
+
+void Utils::CalcHoleGazes(std::vector<Hole> &holes, GazeScores gaze_scores, int patch_size) {
+    std::vector<float> summed_scores;
+    float max_sum = 0;
+    int max_x = gaze_scores.scores.rows() - 1;
+    int max_y = gaze_scores.scores.cols() - 1;
+    for (auto& hole : holes) {
+        Eigen::Vector3i coord = gaze_scores.grid.getGridCoordinates(hole.centroid.x, hole.centroid.y,
+                                                                        hole.centroid.z);
+        float summed_score = 0;
+        for(int idx_x = -patch_size; idx_x <= patch_size; idx_x++) {
+            int x = std::max(0, coord.x() + idx_x + gaze_scores.offset_x);
+            x = std::min(x, max_x);
+            for(int idx_y = -patch_size; idx_y <= patch_size; idx_y++) {
+                int y = std::max(0, coord.y() + idx_y + gaze_scores.offset_y);
+                y = std::min(y, max_y);
+                summed_score += gaze_scores.scores(x, y);
+            }
+        }
+        summed_scores.push_back(summed_score);
+        if (summed_score > max_sum) {
+            max_sum = summed_score;
+        }
+    }
+    for(int i = 0; i < holes.size(); i++) {
+        holes[i].score -= (summed_scores[i] / max_sum);
+    }
 }

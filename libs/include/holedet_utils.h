@@ -29,7 +29,6 @@
 #include <pcl/filters/project_inliers.h>
 #include <pcl/filters/crop_box.h>
 #include <pcl/filters/crop_hull.h>
-#include <pcl/filters/passthrough.h>
 #include <pcl/features/boundary.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/surface/concave_hull.h>
@@ -68,7 +67,8 @@ struct Hole {
 };
 
 struct GazeScores {
-    Eigen::MatrixXf scores[4]; //0:0 1:90 2:180, 3:270
+    Eigen::MatrixXf scores;
+    Eigen::MatrixXf angle_scores[4]; //0:0 1:90 2:180, 3:270
     Eigen::MatrixXf occupancy_grid;
     int offset_x;
     int offset_y;
@@ -226,6 +226,8 @@ public:
     /// \param cloud;      the complete preprocessed point cloud
     static void ScoreVertical(std::vector<Hole> &holes,
                               const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
+
+    static void CalcHoleGazes(std::vector<Hole> &holes, GazeScores gaze_scores, int patch_size=2);
 };
 
 #endif //HOLEDET_HOLEDET_UTILS_H
