@@ -235,23 +235,6 @@ void Utils::CreatePointCloudFromImgPts(const pcl::PointCloud<pcl::PointXYZ>::Ptr
     }
 }
 
-void Utils::DrawLinesInCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
-                             const pcl::visualization::PCLVisualizer::Ptr viewer) {
-    bool first = true;
-    int cnt = 0;
-    pcl::PointXYZ last_point = cloud->points[0];
-    for (auto point: *cloud) {
-        if (first) {
-            first = false;
-            continue;
-        }
-        viewer->addLine(point, last_point, 1.0, 0.0, 0.0, "line" + std::to_string(cnt));
-        last_point = point;
-        cnt++;
-    }
-    viewer->addLine(cloud->points[0], last_point, 1.0, 0.0, 0.0, "line" + std::to_string(cnt));
-}
-
 void Utils::DrawGazesInCloud(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &trajectories,
                              const std::vector<std::vector<Eigen::Vector3f>> &gazes,
                              const pcl::visualization::PCLVisualizer::Ptr viewer) {
@@ -470,23 +453,33 @@ bool Utils::GetHoleCovarianceMatrix(const pcl::PointCloud<pcl::PointXYZ>::Ptr cr
                                     const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
                                     Eigen::Matrix3f &cov_matrix) {
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr hole_cloud(new pcl::PointCloud <pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr hole_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    bool is_empty = true;
 
     const uint n = crop_cloud->width;
     pcl::Vertices::Ptr verticesPtr(new pcl::Vertices);
-    std::vector <uint> vert_vec(n);
+    std::vector<uint> vert_vec(n);
     iota(vert_vec.begin(), vert_vec.end(), 0);
     verticesPtr->vertices = vert_vec;
-    std::vector <pcl::Vertices> polygon;
+    std::vector<pcl::Vertices> polygon;
     polygon.push_back(*verticesPtr);
 
-    pcl::CropHull <pcl::PointXYZ> crop;
+    pcl::CropHull<pcl::PointXYZ> crop;
     crop.setHullIndices(polygon);
     crop.setDim(2);
 
     crop.setHullCloud(crop_cloud);
     crop.setInputCloud(cloud);
     crop.filter(*hole_cloud);
+
+    if (hole_cloud->width == 0) {
+#ifdef DEBUG
+        std::cout << "Hole does not enclose any points" << std::endl;
+#endif
+        return is_empty;
+    } else {
+        is_empty = false;
+    }
 
     Eigen::MatrixXf hole_points(hole_cloud->width, 3);
 
@@ -496,21 +489,11 @@ bool Utils::GetHoleCovarianceMatrix(const pcl::PointCloud<pcl::PointXYZ>::Ptr cr
         hole_points.row(i)(2) = hole_cloud->points[i].z;
     }
 
-    bool is_empty = false;
-    if (hole_points.rows() == 0) {
-#ifdef DEBUG
-        std::cout << "Hole does not enclose any points" << std::endl;
-#endif
-        is_empty = true;
-        return is_empty;
-    }
-
     Eigen::MatrixXf centered = hole_points.rowwise() - hole_points.colwise().mean();
     cov_matrix = (centered.adjoint() * centered) / float(hole_points.rows() - 1);
 
     return is_empty;
 }
-
 
 void Utils::ScoreVertical(std::vector<Hole> &holes,
                           const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
@@ -552,13 +535,10 @@ void Utils::ScoreVertical(std::vector<Hole> &holes,
 void Utils::Calc2DNormals(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::Normal>::Ptr normals,
                           float search_radius) {
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
-
     Normal2dEstimation norm_estim;
     norm_estim.setInputCloud(cloud);
     norm_estim.setSearchMethod(tree);
-
     norm_estim.setRadiusSearch(search_radius);
-
     norm_estim.compute(normals);
 }
 
@@ -569,11 +549,11 @@ void Utils::CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::
     pcl::PointCloud<pcl::PointXYZ>::Ptr points_front(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr points_back(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PassThrough<pcl::PointXYZ> passY;
-    passY.setFilterFieldName ("y");
+    passY.setFilterFieldName("y");
     pcl::PassThrough<pcl::PointXYZ> passFront;
-    passFront.setFilterFieldName ("x");
+    passFront.setFilterFieldName("x");
     pcl::PassThrough<pcl::PointXYZ> passBack;
-    passBack.setFilterFieldName ("x");
+    passBack.setFilterFieldName("x");
 
     for (int i = 0; i < holes.size(); ++i) {
         std::vector<pcl::PointXYZ> visited;
@@ -586,19 +566,19 @@ void Utils::CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::
         //std::cout << "Filter size of hole " << i << ": " << filter_size << "\n";
         step_back = 0.3;
 
-        passY.setFilterLimits (-filter_size, filter_size);
-        passFront.setFilterLimits (0, 2*filter_size);
-        passBack.setFilterLimits (-2*filter_size,0);
+        passY.setFilterLimits(-filter_size, filter_size);
+        passFront.setFilterLimits(0, 2 * filter_size);
+        passBack.setFilterLimits(-2 * filter_size, 0);
 
         pcl::PointXYZ keypoint = holes[i].points->points[0]; //Temp variable for keypoints
-        for (int j = 0; j < normals->size(); ++j){
+        for (int j = 0; j < normals->size(); ++j) {
             pcl::PointXYZ boundary_point = holes[i].points->points[j];
 
             //Handle keypoint choice
             bool skip = false;
-            if(j != 0) {
-                for(auto& visited_point : visited) {
-                    if(pcl::euclideanDistance(boundary_point, visited_point) < step_back) {
+            if (j != 0) {
+                for (auto &visited_point: visited) {
+                    if (pcl::euclideanDistance(boundary_point, visited_point) < step_back) {
                         skip = true;
                         break;
                     }
@@ -606,7 +586,7 @@ void Utils::CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::
             }
 
             //Skip if not keypoint
-            if(!skip) {
+            if (!skip) {
                 //Get translation
                 Eigen::Affine3f pose = Eigen::Affine3f::Identity();
                 pose.translation() = boundary_point.getVector3fMap();
@@ -615,51 +595,44 @@ void Utils::CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::
                 Eigen::Vector3f dir(normals->points[j].normal_x, normals->points[j].normal_y,
                                     normals->points[j].normal_z);
                 pose.rotate(Eigen::AngleAxisf(atan2(dir(1), dir(0)), Eigen::Vector3f(0, 0, 1)));
-                pose.rotate(Eigen::AngleAxisf(atan2(dir(2), sqrt(dir(0) * dir(0) + dir(1) * dir(1))),Eigen::Vector3f(0, 1, 0)));
+                pose.rotate(Eigen::AngleAxisf(atan2(dir(2), sqrt(dir(0) * dir(0) + dir(1) * dir(1))),
+                                              Eigen::Vector3f(0, 1, 0)));
 
                 ///Handle wrong direction normals
-                pcl::transformPointCloud(*floor_projected, *points_front, pose.inverse(), true); //Transform points to current pose
+                pcl::transformPointCloud(*floor_projected, *points_front, pose.inverse(),
+                                         true); //Transform points to current pose
                 pcl::transformPointCloud(*floor_projected, *points_back, pose.inverse(), true);
 
                 //pass.setFilterLimitsNegative (true);
-                passY.setInputCloud (points_front);
+                passY.setInputCloud(points_front);
                 passY.filter(*points_front);
                 passY.filter(*points_back);
 
                 //pass.setFilterLimitsNegative (true);
-                passFront.setInputCloud (points_front);
+                passFront.setInputCloud(points_front);
                 passFront.filter(*points_front);
 
                 //pass.setFilterLimitsNegative (true);
-                passBack.setInputCloud (points_back);
+                passBack.setInputCloud(points_back);
                 passBack.filter(*points_back);
 
                 //Switch dirention if nessecary
-                if(points_front->size() > points_back->size()) {
+                if (points_front->size() > points_back->size()) {
                     pose.rotate(Eigen::AngleAxisf(M_PI, Eigen::Vector3f(0, 0, 1)));
                     //std::cout << "Rotated pose!\n";
                     holes[i].rotateds.push_back(true);
-                }else{
+                } else {
                     holes[i].rotateds.push_back(false);
                 }
 
                 //Take a step back
-                pose.translate(Eigen::Vector3f(-step_back,0,0));
+                pose.translate(Eigen::Vector3f(-step_back, 0, 0));
                 visited.push_back(boundary_point);
                 holes[i].poses.push_back(pose);
             }
         }
 
     }
-}
-
-void Utils::Grid(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
-    pcl::VoxelGrid<pcl::PointXYZ> grid;
-//    grid.setInputCloud(cloud);
-    grid.setLeafSize(0.1f, 0.1f, 0.1f);
-    auto coords = grid.getGridCoordinates(0, 0, 0);
-    coords = grid.getGridCoordinates(1, 3, 0);
-    coords = grid.getGridCoordinates(1, 2, 0);
 }
 
 void Utils::CreateGrid(pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud,
@@ -724,10 +697,10 @@ float Utils::CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ 
     return dist > 10 ? 0 : std::exp(-0.43 * dist);
 }
 
-void Utils::CalcGazeScores(GazeScores &gaze_scores,
-                           std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> trajectories,
-                           std::vector<std::vector<Eigen::Vector3f>> gazes,
-                           int num_of_angles) {
+void Utils::CalcHeatMaps(GazeScores &gaze_scores,
+                         std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> trajectories,
+                         std::vector<std::vector<Eigen::Vector3f>> gazes,
+                         int num_of_angles) {
     int rows = gaze_scores.occupancy_grid.rows();
     int cols = gaze_scores.occupancy_grid.cols();
     gaze_scores.angle_scores[0] = Eigen::MatrixXf::Zero(rows, cols);
@@ -787,19 +760,19 @@ void Utils::CalcGazeScores(GazeScores &gaze_scores,
     std::cout << "done" << std::endl;
 }
 
-void Utils::CalcHoleGazes(std::vector<Hole> &holes, GazeScores gaze_scores, int patch_size) {
+void Utils::CalcGazeScores(std::vector<Hole> &holes, GazeScores gaze_scores, int patch_size) {
     std::vector<float> summed_scores;
     float max_sum = 0;
     int max_x = gaze_scores.scores.rows() - 1;
     int max_y = gaze_scores.scores.cols() - 1;
-    for (auto& hole : holes) {
+    for (auto &hole: holes) {
         Eigen::Vector3i coord = gaze_scores.grid.getGridCoordinates(hole.centroid.x, hole.centroid.y,
-                                                                        hole.centroid.z);
+                                                                    hole.centroid.z);
         float summed_score = 0;
-        for(int idx_x = -patch_size; idx_x <= patch_size; idx_x++) {
+        for (int idx_x = -patch_size; idx_x <= patch_size; idx_x++) {
             int x = std::max(0, coord.x() + idx_x + gaze_scores.offset_x);
             x = std::min(x, max_x);
-            for(int idx_y = -patch_size; idx_y <= patch_size; idx_y++) {
+            for (int idx_y = -patch_size; idx_y <= patch_size; idx_y++) {
                 int y = std::max(0, coord.y() + idx_y + gaze_scores.offset_y);
                 y = std::min(y, max_y);
                 summed_score += gaze_scores.scores(x, y);
@@ -810,7 +783,7 @@ void Utils::CalcHoleGazes(std::vector<Hole> &holes, GazeScores gaze_scores, int 
             max_sum = summed_score;
         }
     }
-    for(int i = 0; i < holes.size(); i++) {
+    for (int i = 0; i < holes.size(); i++) {
         holes[i].score -= (summed_scores[i] / max_sum);
     }
 }

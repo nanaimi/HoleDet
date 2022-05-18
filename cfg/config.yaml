@@ -1,6 +1,6 @@
 ---
-debug: true
-use_gaze: false
+use_existing_floorplan: true
+use_gaze:               false
 input:
   cloud_file:      data/hololens.pcd
   gaze_file:       data/gaze_directions.obj
@@ -10,14 +10,14 @@ input:
 parameters:
   poisson_depth:          7
   normal_search_radius:   0.5
-  outlier_radius:         3
-  outlier_min_neighbours: 10
+  outlier_radius:         1
+  outlier_min_neighbours: 5
   image_resolution:       0.0694
   max_iteration:          10000
   max_translation:        5
   max_angle:              10
   start_score:            5.0
   boundary_search_radius: 0.6
-  angle_thresh:           0.8
+  angle_thresh:           3.14
   vert_score_threshold:   0.6
-  min_score:              3
+  min_score:              0

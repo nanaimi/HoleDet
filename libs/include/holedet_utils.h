@@ -48,9 +48,9 @@
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/core.hpp>
 
-#include "Normal2dEstimation.h"
-
 #include <eigen3/Eigen/Eigenvalues>
+
+#include "Normal2dEstimation.h"
 
 struct Hole {
     pcl::PointXYZ centroid;
@@ -74,13 +74,20 @@ struct GazeScores {
 
 class Utils {
 public:
-    ///
+    /// Takes a filename of a pcd file and fills the point cloud
     /// \param file_name string, e.g "hololens.pcd"
-    /// \param reader pcl::PCDReader reader
+    /// \param reader pcl::PCDReader reader_
     /// \return shared pointer pcl::PointCloud<pcl::PointXYZ>::Ptr
     static pcl::PointCloud<pcl::PointXYZ>::Ptr ReadCloud(const std::basic_string<char> &file_name,
                                                          pcl::PCDReader &reader);
 
+    /// Creates the trajectory and gaze variables from the files
+    /// \param traj_file_name The filepath of the trajectroy file
+    /// \param gaze_file_name The filepath of the gaze file
+    /// \param lenghts_file_name The filepath of the keyframes length
+    /// \param reader The pcd Reader
+    /// \param trajectories The trajectory variable
+    /// \param gazes The gaze variable
     static void ReadTrajectoriesAndGaze(const std::basic_string<char> &traj_file_name,
                                         const std::basic_string<char> &gaze_file_name,
                                         const std::basic_string<char> &lenghts_file_name,
@@ -89,7 +96,7 @@ public:
                                         std::vector<std::vector<Eigen::Vector3f>> &gazes);
 
 
-    ///
+    /// Fits a floor plane to the pointcloud using RANSAC and then projects it
     /// \param cloud input point cloud
     /// \param floor cloud to which unprojected floor_ will be extracted
     /// \param floor_projected floor_ cloud projected to the estimated plane equation
@@ -99,17 +106,16 @@ public:
                                        pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected,
                                        pcl::ModelCoefficients::Ptr coefficients);
 
-    ///
+    /// Creates the concave hull of a cloud
     /// \param input_cloud input point cloud
     /// \param hull_cloud point cloud containing the points on the concave hull
     /// \param polygons the resultant concave hull polygons, as a set of vertices.
-    /// The Vertices structure contains an array of point indices.
     /// \param chull PCL concave hull object
     static void CreateConcaveHull(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud,
                                   pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud,
                                   std::vector<pcl::Vertices> polygons, pcl::ConcaveHull<pcl::PointXYZ> chull);
 
-    ///
+    /// Calculates the boundary points of a cloud and filters them using the hull
     /// \param input_cloud input point cloud
     /// \param hull_cloud point cloud containing the points on the concave hull
     /// \param interior_boundaries point cloud containing the interior boundary points
@@ -118,7 +124,7 @@ public:
                                       pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries,
                                       pcl::PointCloud<pcl::Normal>::Ptr normals);
 
-    ///
+    /// Clusters the boundary points into hole clouds
     /// \param interior_boundaries point cloud containing the interior boundary points
     /// \param holes vector containing the point clouds for the individual holes
     /// \param hole_sizes number of points in each hole point cloud
@@ -126,13 +132,13 @@ public:
                               const float n_search_radius, pcl::PointCloud<pcl::Normal>::Ptr boundary_normals,
                               const float angle_thresh);
 
-    ///
+    /// Calculates the centroid of every hole cloud
     /// \param holes vector containing the point clouds for the individual holes
     /// \param min_size minimum number of points in hole cloud required
     /// \param centers vector of points representing hole centers
     static void CalcHoleCenters(std::vector<Hole> &holes);
 
-    ///
+    /// Calculates the score of each hole based on the area median
     /// \param holes vector containing the point clouds for the individual holes
     /// \param min_size minimum number of points in hole cloud required
     /// \param centers vector of points representing hole centers
@@ -145,12 +151,10 @@ public:
                                            std::vector<cv::Point> img_pts,
                                            const float img_resolution);
 
-    /// Draws a line between all points in the cloud
-    /// \param cloud;
-    /// \param viewer;
-    static void DrawLinesInCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
-                                 const pcl::visualization::PCLVisualizer::Ptr viewer);
-
+    /// For future work
+    /// \param trajectories
+    /// \param gazes
+    /// \param viewer
     static void DrawGazesInCloud(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &trajectories,
                                  const std::vector<std::vector<Eigen::Vector3f>> &gazes,
                                  const pcl::visualization::PCLVisualizer::Ptr viewer);
@@ -186,16 +190,32 @@ public:
                               const double normal_search_radius,
                               const int poisson_depth);
 
+    /// Calculates the 2d normals using pca
+    /// \param cloud The input cloud
+    /// \param normals The 3d normals
+    /// \param search_radius the search radius for neighbours
     static void Calc2DNormals(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::Normal>::Ptr normals,
                               float search_radius);
 
+    /// Calculates the poses used to resample the hole
+    /// \param holes The holes
+    /// \param floor_projected The floor cloud
     static void CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected);
 
-    static void Grid(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
-
+    /// Creates an occupancy grid from the floorplan cloud stored in the gaze scores variable
+    /// \param dense_cloud The floorplan cloud
+    /// \param gaze_scores The gaze scores variable
     static void CreateGrid(pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud,
                            GazeScores &gaze_scores);
 
+    /// Calculates the next coordinate in the grid by ray marching
+    /// \param gaze The ray direction
+    /// \param gaze_scores The gaze scores variable
+    /// \param curr_point The point where the ray starts
+    /// \param visited All visited grid coordinates
+    /// \param next_point The next grid coordinate
+    /// \param step_size The step size of the ray marching
+    /// \return A bool that is true if a point has been found
     static bool CalculateNextGridPoint(const Eigen::Vector3f &gaze,
                                        GazeScores gaze_scores,
                                        pcl::PointXYZ curr_point,
@@ -203,12 +223,21 @@ public:
                                        pcl::PointXYZ &next_point,
                                        float step_size = 0.01);
 
+    /// Implements the distance scoring function
+    /// \param grid_point The next calculated point
+    /// \param gaze_point the point where the gaze ray starts
+    /// \return The score
     static float CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ gaze_point);
 
-    static void CalcGazeScores(GazeScores &gaze_scores,
-                               std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> trajectories,
-                               std::vector<std::vector<Eigen::Vector3f>> gazes,
-                               int num_of_angles = 7);
+    /// Main function to create the heat maps
+    /// \param gaze_scores gaze scores variable
+    /// \param trajectories the trajectory variable
+    /// \param gazes the gaze variable
+    /// \param num_of_angles num of angles used to sample 140 degrees
+    static void CalcHeatMaps(GazeScores &gaze_scores,
+                             std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> trajectories,
+                             std::vector<std::vector<Eigen::Vector3f>> gazes,
+                             int num_of_angles = 7);
 
     /// Get Covariance matrix from point cloud
     /// \param crop_cloud; the 2D point cloud that defines the hole
@@ -226,7 +255,11 @@ public:
                               const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
                               const float vert_score_threshold);
 
-    static void CalcHoleGazes(std::vector<Hole> &holes, GazeScores gaze_scores, int patch_size=2);
+    /// Calculates the score of each hole based on the median gaze patch
+    /// \param holes The holes
+    /// \param gaze_scores Gaze scores variable
+    /// \param patch_size size of the patch considered for the score
+    static void CalcGazeScores(std::vector<Hole> &holes, GazeScores gaze_scores, int patch_size = 2);
 };
 
 #endif //HOLEDET_HOLEDET_UTILS_H

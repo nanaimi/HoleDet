@@ -31,9 +31,9 @@ HoleDetector::HoleDetector(const basic_string<char> &path, const basic_string<ch
     tp_.cnt = 0;
 
     InitFilters();
-    raw_cloud_ = Utils::ReadCloud(pointcloud_file_, reader);
+    raw_cloud_ = Utils::ReadCloud(pointcloud_file_, reader_);
     Utils::ReadTrajectoriesAndGaze(trajectory_file_, gaze_file_,
-                                   lengths_file_, reader, trajectories_, gazes_);
+                                   lengths_file_, reader_, trajectories_, gazes_);
     PreProcess();
     Utils::ExtractAndProjectFloor(filtered_cloud_, floor_, floor_projected_,
                                   floor_coefficients_);
@@ -42,8 +42,8 @@ HoleDetector::HoleDetector(const basic_string<char> &path, const basic_string<ch
 void HoleDetector::ReadYAML() {
     try {
         YAML::Node config = YAML::LoadFile(config_file_);
-        debug_ = config["debug"].as<bool>();
-        use_gaze_ = config["use_gaze"].as<bool>();
+        kUseExistingFloorplan_ = config["use_existing_floorplan"].as<bool>();
+        kUseGaze_ = config["use_gaze"].as<bool>();
         std::cout << "loading" << std::endl;
         pointcloud_file_ = path_ + config["input"]["cloud_file"].as<std::string>();
         trajectory_file_ = path_ + config["input"]["trajectory_file"].as<std::string>();
@@ -62,24 +62,23 @@ void HoleDetector::ReadYAML() {
         kMaxTranslation_ = config["parameters"]["max_translation"].as<int>();
         kMaxAngle_ = config["parameters"]["max_angle"].as<int>(); // [deg]
 
-        boundary_search_radius_ = config["parameters"]["boundary_search_radius"].as<float>();
-        angle_thresh_ = config["parameters"]["angle_thresh"].as<float>();
+        kBoundarySearchRadius_ = config["parameters"]["boundary_search_radius"].as<float>();
+        kAngleThresh_ = config["parameters"]["angle_thresh"].as<float>();
 
-        vert_score_threshold_ = config["parameters"]["vert_score_threshold"].as<float>();
+        kVertScoreThresh_ = config["parameters"]["vert_score_threshold"].as<float>();
 
-        min_score_ = config["parameters"]["min_score"].as<float>();
+        kMinScore_ = config["parameters"]["min_score"].as<float>();
     } catch (const YAML::ParserException &ex) {
         std::cout << ex.what() << std::endl;
     }
 }
 
 void HoleDetector::InitFilters() {
-    outrem_.setRadiusSearch(1);
-    outrem_.setMinNeighborsInRadius(5);
+    outrem_.setRadiusSearch(kOutlierRadius_);
+    outrem_.setMinNeighborsInRadius(kMinNeighbours_);
     outrem_.setKeepOrganized(true);
 
     voxel_filter_.setMinimumPointsNumberPerVoxel(2);
-
     voxel_filter_.setLeafSize(0.1, 0.1, 0.1);
 
     gaze_scores_.grid.setLeafSize(0.1f, 0.1f, 0.1f);
@@ -88,10 +87,6 @@ void HoleDetector::InitFilters() {
 void HoleDetector::PreProcess() {
     outrem_.setInputCloud(raw_cloud_);
     outrem_.filter(*filtered_cloud_);
-
-    // voxel_filter_.setInputCloud (filtered_cloud_);
-    // voxel_filter_.filter(*filtered_cloud_);
-
 }
 
 void HoleDetector::DetectHoles() {
@@ -99,35 +94,40 @@ void HoleDetector::DetectHoles() {
     Utils::CreateConcaveHull(floor_projected_, hull_cloud_, hull_polygons_, chull_);
     *dense_floorplan_ += *hull_cloud_;
     Utils::GetInteriorBoundaries(floor_projected_, dense_floorplan_, interior_boundaries_, floor_normals_);
-    Utils::Calc2DNormals(interior_boundaries_, boundary_normals_, boundary_search_radius_);
+    Utils::Calc2DNormals(interior_boundaries_, boundary_normals_, kBoundarySearchRadius_);
     CalculateCentroids();
 }
 
 void HoleDetector::GazeMap() {
+    if (!kUseGaze_) { return; }
+
     Utils::CreateGrid(dense_floorplan_, gaze_scores_);
-    Utils::CalcGazeScores(gaze_scores_,trajectories_, gazes_);
+    Utils::CalcHeatMaps(gaze_scores_, trajectories_, gazes_);
     gaze_scores_.scores = gaze_scores_.angle_scores[0] + gaze_scores_.angle_scores[1] +
-                            gaze_scores_.angle_scores[2] + gaze_scores_.angle_scores[3];
-    for(int i = 0; i < 5; i++) {
+                          gaze_scores_.angle_scores[2] + gaze_scores_.angle_scores[3];
+    CreateAndVisualizeHeatMap();
+
+}
+
+void HoleDetector::CreateAndVisualizeHeatMap() {
+    for (int i = 0; i < 5; i++) {
         cv::Mat scores_img;
         cv::Mat heatmap;
-        if(i == 0) {
+        if (i == 0) {
             cv::eigen2cv(gaze_scores_.scores, scores_img);
         } else {
             cv::eigen2cv(gaze_scores_.angle_scores[i - 1], scores_img);
         }
 
-
         double max;
         cv::minMaxLoc(scores_img, NULL, &max, NULL, NULL);
-
 
         scores_img = scores_img / max;
         scores_img.convertTo(scores_img, CV_8U, 255);
         cv::applyColorMap(scores_img, heatmap, cv::COLORMAP_JET);
 
         for (int j = 0; j < holes_.size(); j++) {
-            if (holes_[i].score < min_score_) { continue; }
+            if (holes_[i].score < kMinScore_) { continue; }
             for (auto point: *holes_[j].points) {
                 auto coords = gaze_scores_.grid.getGridCoordinates(point.x, point.y, point.z);
                 auto px = gaze_scores_.offset_x + coords.x();
@@ -149,7 +149,7 @@ void HoleDetector::GazeMap() {
         cv::resize(heatmap, resized, cv::Size(heatmap.cols * 2, heatmap.rows * 2));
         std::string fname = std::to_string(i) + ".jpg";
         imwrite(fname, resized);
-        while(true) {
+        while (true) {
             cv::imshow("angle_scores", resized);
             if (cv::waitKey(10) == 27) {
                 cv::destroyAllWindows();
@@ -157,24 +157,27 @@ void HoleDetector::GazeMap() {
             }
         }
     }
-}
+};
 
 void HoleDetector::CalculateCentroids() {
-    Utils::GetHoleClouds(holes_, interior_boundaries_, boundary_search_radius_, boundary_normals_, angle_thresh_);
+    Utils::GetHoleClouds(holes_, interior_boundaries_, kBoundarySearchRadius_, boundary_normals_, kAngleThresh_);
     Utils::CalcHoleCenters(holes_);
-    std::cout << holes_.size() << "\n";
-    for(auto& hole : holes_) {
-        hole.score = use_gaze_ ? 3 : 2;
+    std::cout << "Nr. of holes found:\t" << holes_.size() << "\n";
+    for (auto &hole: holes_) {
+        hole.score = kUseGaze_ ? 3 : 2;
     }
 }
 
-void HoleDetector::CalculateScores() {
-    /* Calculate A score based on the Area */
+void HoleDetector::CalculateScoresAndPoses() {
     Utils::CalcAreaScore(holes_, cvxhull_);
-    Utils::ScoreVertical(holes_, floorplan_filtered_, vert_score_threshold_);
-    if(use_gaze_) {
-        Utils::CalcHoleGazes(holes_, gaze_scores_);
+    Utils::ScoreVertical(holes_, floorplan_filtered_, kVertScoreThresh_);
+
+    if (kUseGaze_) {
+        Utils::CalcGazeScores(holes_, gaze_scores_);
     }
+
+    std::sort(holes_.begin(), holes_.end(), [](Hole a, Hole b) { return a.score > b.score; });
+    Utils::CalcPoses(holes_, floor_projected_);
 
     for (int i = 0; i < holes_.size(); i++) {
         float score = holes_[i].score;
@@ -185,10 +188,6 @@ void HoleDetector::CalculateScores() {
 
         cout << "Hole " << str_nmb << ":\tScore :" << to_string(score) << "\n";
     }
-}
-
-void HoleDetector::CalculatePoses() {
-    Utils::CalcPoses(holes_, floor_projected_);
 }
 
 void HoleDetector::Visualize() {
@@ -214,7 +213,7 @@ void HoleDetector::Visualize() {
     viewer_->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 0.1, "interior_boundaries_");
 
     for (int i = 0; i < holes_.size(); i++) {
-        if (holes_[i].score < min_score_) { continue; }
+        if (holes_[i].score < kMinScore_) { continue; }
         auto name = "hole_" + std::to_string(i);
         float r1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
         float r3 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
@@ -230,10 +229,12 @@ void HoleDetector::Visualize() {
             pcl::PointXYZ p(holes_[i].poses[j].translation().x(),
                             holes_[i].poses[j].translation().y(),
                             holes_[i].poses[j].translation().z());
-            if(holes_[i].rotateds[j]){
-                viewer_->addSphere(p, 0.05, 255,255, 255,center_name + "_pose" + std::to_string(j)); //add colour sphere to pose
-            }else {
-                viewer_->addSphere(p, 0.05, r1, 1 - r1, r3,center_name + "_pose" + std::to_string(j)); //add colour sphere to pose
+            if (holes_[i].rotateds[j]) {
+                viewer_->addSphere(p, 0.05, 255, 255, 255,
+                                   center_name + "_pose" + std::to_string(j)); //add colour sphere to pose
+            } else {
+                viewer_->addSphere(p, 0.05, r1, 1 - r1, r3,
+                                   center_name + "_pose" + std::to_string(j)); //add colour sphere to pose
             }
             viewer_->addCoordinateSystem(0.2, holes_[i].poses[j]); //display pose
         }
@@ -251,11 +252,11 @@ void HoleDetector::Visualize() {
 
 }
 
-void HoleDetector::GetFloorplanCloud(bool debug, string floorplan_path) {
+void HoleDetector::GetFloorplanCloud(string floorplan_path) {
 
-    if (debug) {
+    if (kUseExistingFloorplan_) {
         if (io::loadPCDFile<PointXYZ>(floorplan_path, *floorplan_) == -1) {
-            PCL_ERROR ("Couldn't read file\n");
+            PCL_ERROR("Couldn't read file\n");
         }
     } else {
         mp_.img = cv::imread(floorplan_file_);
@@ -268,6 +269,7 @@ void HoleDetector::GetFloorplanCloud(bool debug, string floorplan_path) {
                 cv::destroyAllWindows();
                 break;
             }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
         visualization::PCLVisualizer::Ptr pp_viewer(new visualization::PCLVisualizer("Cloud Viewer"));
@@ -288,9 +290,12 @@ void HoleDetector::GetFloorplanCloud(bool debug, string floorplan_path) {
         }
         Utils::TransformPointCloud(floorplan_, floor_projected_, tp_.points,
                                    kMaxIteration_, kMaxAngle_, kMaxTranslation_);
+        pcl::io::savePCDFileASCII(floorplan_path, *floorplan_);
     }
 }
 
+// TODO: refactor code to derive point cloud used for mesh reconstruction somewhere else
+// TODO: add bool to config for calculating mesh or not
 void HoleDetector::GetFullMesh() {
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr full_cloud(new pcl::PointCloud<pcl::PointXYZ>);
@@ -387,10 +392,6 @@ void HoleDetector::GetFullMesh() {
 
 }
 
-void HoleDetector::SetBoundarySearchRadius(const float value) {
-    boundary_search_radius_ = value;
-}
-
 void HoleDetector::PpCallback(const pcl::visualization::PointPickingEvent &event, void *viewer_void) {
     std::cout << "Picking event active" << std::endl;
     if (event.getPointIndex() != -1) {
@@ -428,7 +429,7 @@ void HoleDetector::KeyboardEventOccurred(const visualization::KeyboardEvent &eve
     if (event.getKeySym() == "i" && event.keyDown()) {
         event_viewer->removeAllShapes();
         event_viewer->removeAllPointClouds();
-        boundary_search_radius_ += 0.1;
+        kBoundarySearchRadius_ += 0.1;
         cout << "i was pressed => increasing the boundary point search radius by 0.1" << endl;
         CalculateCentroids();
         Visualize();
@@ -436,7 +437,7 @@ void HoleDetector::KeyboardEventOccurred(const visualization::KeyboardEvent &eve
     if (event.getKeySym() == "r" && event.keyDown()) {
         event_viewer->removeAllShapes();
         event_viewer->removeAllPointClouds();
-        boundary_search_radius_ -= 0.1;
+        kBoundarySearchRadius_ -= 0.1;
         cout << "i was pressed => reducing the boundary point search radius by 0.1" << endl;
         CalculateCentroids();
         Visualize();
@@ -448,9 +449,9 @@ void HoleDetector::KeyboardEventOccurred(const visualization::KeyboardEvent &eve
         Visualize();
         viewer_->addPolygonMesh(full_mesh_, "full_mesh", 0);
     }
-    if (event.getKeySym() == "z" && event.keyDown()) {
+    if (event.getKeyCode() == 9 && event.keyDown()) {
         if (event_viewer->contains("hole")) {
-            cout << "z was pressed => cycling through to next hole" << endl;
+            cout << "Tab was pressed => cycling through to next hole" << endl;
             event_viewer->removePointCloud("hole");
 
             auto name = "hole_" + std::to_string(hole_index_);
@@ -467,7 +468,7 @@ void HoleDetector::KeyboardEventOccurred(const visualization::KeyboardEvent &eve
                 } else {
                     hole_index_ = 0;
                 }
-            } while (holes_.at(hole_index_).score < 4);
+            } while (holes_.at(hole_index_).score < kMinScore_);
 
             name = "hole_" + std::to_string(hole_index_);
 

@@ -26,27 +26,29 @@ class HoleDetector {
 public:
     HoleDetector(const basic_string<char> &path, const basic_string<char> &config_filename);
 
-    bool debug_;
-    bool use_gaze_;
-
+    /// Main hole detecting function
     void DetectHoles();
 
-    void GetFloorplanCloud(bool debug, string floorplan_path);
+    /// Creates a point cloud of the vertices aligned with original floor plan vertices
+    void GetFloorplanCloud(string floorplan_path);
 
+    /// Creates the mesh using an augmented and filtered point cloud
     void GetFullMesh();
 
-    void CalculateScores();
+    /// Calculates all the score components for each hole
+    void CalculateScoresAndPoses();
 
+    /// Create the gaze maps in four different directions
     void GazeMap();
 
+    /// Produces set of poses for resampling each hole
     void CalculatePoses();
 
+    /// Visualizes everytin
     void Visualize();
 
-    void SetBoundarySearchRadius(const float value);
-
 private:
-    // constants
+    // all paths and files
     basic_string<char> path_;
     basic_string<char> config_file_;
     basic_string<char> pointcloud_file_;
@@ -54,25 +56,34 @@ private:
     basic_string<char> gaze_file_;
     basic_string<char> lengths_file_;
     basic_string<char> floorplan_file_;
-    PCDReader reader;
 
+    // PCD Reader
+    PCDReader reader_;
 
+    // PCL Visualizer
+    visualization::PCLVisualizer::Ptr viewer_;
 
+    // Constants and tuning parameters
+    bool kUseGaze_;
+    bool kUseExistingFloorplan_;
     int kPoissonDepth_;
     float kNormalSearchRadius_;
-
     double kOutlierRadius_;
     int kMinNeighbours_;
-
     double kImgResolution_; // [m/px]
     int kMaxIteration_;
     int kMaxTranslation_;
     int kMaxAngle_; // [deg]
+    double kMinScore_;
+    float kBoundarySearchRadius_;
+    float kAngleThresh_;
+    float kVertScoreThresh_;
 
-    // vector of holes
+    // Hole variables
     vector<Hole> holes_;
     int hole_index_;
 
+    // Gaze variables
     GazeScores gaze_scores_;
 
     // Point Picking
@@ -97,40 +108,44 @@ private:
     pcl::PointCloud<pcl::Normal>::Ptr boundary_normals_;
     PointCloud<PointXYZ>::Ptr floorplan_filtered_;
 
+    // Poses and headings
     std::vector<PointCloud<PointXYZ>::Ptr> trajectories_;
     std::vector<std::vector<Eigen::Vector3f>> gazes_;
 
     // Meshes
     pcl::PolygonMesh full_mesh_;
 
+    // Reconstruction variables
     pcl::ModelCoefficients::Ptr floor_coefficients_;
     std::vector<pcl::Vertices> hull_polygons_;
     pcl::ConcaveHull<pcl::PointXYZ> chull_;
     pcl::ConvexHull<pcl::PointXYZ> cvxhull_;
 
-    // Visualizer
-    visualization::PCLVisualizer::Ptr viewer_;
-
-    // Tuning Parameters
-    double min_score_;
-    float boundary_search_radius_;
-    float angle_thresh_;
-    float vert_score_threshold_;
-
+    /// Reads in the config file and initializes respective constants.
     void ReadYAML();
 
+    /// Initializes outlier removal filter and voxel filter.
     void InitFilters();
 
+    /// Applies initial filtering; removes noise
     void PreProcess();
 
+    /// Calculate the centroids of the detected holes
     void CalculateCentroids();
 
+    /// Creates heatmaps and visualizes them
+    void CreateAndVisualizeHeatMap();
+
+    /// Keyboard listener for interacting with visualization
     void KeyboardEventOccurred(const visualization::KeyboardEvent &event, void *viewer_void);
 
+    /// Get coordinates of the picked points
     static void PpCallback(const visualization::PointPickingEvent &event, void *viewer_void);
 
+    /// Callback for selecting vertices of floorplan in point cloud
     static void PointPickerCb(const visualization::PointPickingEvent &event, void *param);
 
+    /// Callback for selecting vertices of floorplan in images
     static void OnMouse(int event, int x, int y, int flags, void *param);
 
 };
