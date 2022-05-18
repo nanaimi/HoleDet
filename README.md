@@ -17,8 +17,8 @@
 
 ### exploration
 - [x] general data exploration (clustering, local statistics, etc.) (matt)
-- [ ] mesh approach (nasib)
-- [ ] height diff stuff (moe)
+- [x] mesh approach (nasib)
+- [x] height diff stuff (moe)
 - [x] ask mapping guys asl (laurent)
 - [x] try different segmentation techniques (matt)
 - [x] read automated mav mapping paper, prototype approach (mau zedong)
