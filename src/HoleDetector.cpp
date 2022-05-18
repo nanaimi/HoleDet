@@ -33,7 +33,7 @@ HoleDetector::HoleDetector(const basic_string<char> &path, const basic_string<ch
     InitFilters();
     raw_cloud_ = Utils::ReadCloud(pointcloud_file_, reader);
     Utils::ReadTrajectoriesAndGaze(trajectory_file_, gaze_file_,
-                                        lengths_file_, reader, trajectories_, gazes_);
+                                   lengths_file_, reader, trajectories_, gazes_);
     PreProcess();
     Utils::ExtractAndProjectFloor(filtered_cloud_, floor_, floor_projected_,
                                   floor_coefficients_);
@@ -65,9 +65,9 @@ void HoleDetector::ReadYAML() {
         boundary_search_radius_ = config["parameters"]["boundary_search_radius"].as<float>();
         angle_thresh_ = config["parameters"]["angle_thresh"].as<float>();
 
+        vert_score_threshold_ = config["parameters"]["vert_score_threshold"].as<float>();
+
         min_score_ = config["parameters"]["min_score"].as<float>();
-
-
     } catch (const YAML::ParserException &ex) {
         std::cout << ex.what() << std::endl;
     }
@@ -80,7 +80,7 @@ void HoleDetector::InitFilters() {
 
     voxel_filter_.setMinimumPointsNumberPerVoxel(2);
 
-    voxel_filter_.setLeafSize (0.1, 0.1, 0.1);
+    voxel_filter_.setLeafSize(0.1, 0.1, 0.1);
 
     gaze_scores_.grid.setLeafSize(0.1f, 0.1f, 0.1f);
 }
@@ -132,7 +132,7 @@ void HoleDetector::GazeMap() {
                 auto coords = gaze_scores_.grid.getGridCoordinates(point.x, point.y, point.z);
                 auto px = gaze_scores_.offset_x + coords.x();
                 auto py = gaze_scores_.offset_y + coords.y();
-                cv::Vec3b & color = heatmap.at<cv::Vec3b>(px,py);
+                cv::Vec3b &color = heatmap.at<cv::Vec3b>(px, py);
                 color[0] = 0;
                 color[1] = 0;
                 color[2] = 255;
@@ -141,12 +141,12 @@ void HoleDetector::GazeMap() {
             auto coords = gaze_scores_.grid.getGridCoordinates(centroid.x, centroid.y, centroid.z);
             auto px = gaze_scores_.offset_x + coords.x();
             auto py = gaze_scores_.offset_y + coords.y();
-            cv::circle(heatmap, cv::Point(py, px), 2, cv::Scalar( 255, 0, 255 ),cv::FILLED);
+            cv::circle(heatmap, cv::Point(py, px), 2, cv::Scalar(255, 0, 255), cv::FILLED);
 
         }
 
         cv::Mat resized;
-        cv::resize(heatmap, resized, cv::Size(heatmap.cols*2, heatmap.rows*2));
+        cv::resize(heatmap, resized, cv::Size(heatmap.cols * 2, heatmap.rows * 2));
         std::string fname = std::to_string(i) + ".jpg";
         imwrite(fname, resized);
         while(true) {
@@ -171,16 +171,18 @@ void HoleDetector::CalculateCentroids() {
 void HoleDetector::CalculateScores() {
     /* Calculate A score based on the Area */
     Utils::CalcAreaScore(holes_, cvxhull_);
+    Utils::ScoreVertical(holes_, floorplan_filtered_, vert_score_threshold_);
     if(use_gaze_) {
         Utils::CalcHoleGazes(holes_, gaze_scores_);
     }
 
-    for(int i = 0; i < holes_.size(); i++) {
+    for (int i = 0; i < holes_.size(); i++) {
         float score = holes_[i].score;
         std::string str_nmb = to_string(i);
         if (str_nmb.length() < 2) {
             str_nmb = "0" + str_nmb;
         }
+
         cout << "Hole " << str_nmb << ":\tScore :" << to_string(score) << "\n";
     }
 }
@@ -205,13 +207,6 @@ void HoleDetector::Visualize() {
     viewer_->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_COLOR,
                                               1.0f, 0.0f, 0.0f, "dense_floor");
     viewer_->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 3, "dense_floor");
-
-//    viewer_ ->addPointCloud(floorplan_filtered_, "floorplan_filtered");
-//    viewer_->setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_COLOR,
-//                                               0.5f, 0.0f, 0.5f, "floorplan_filtered");
-//    viewer_->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "floorplan_filtered");
-
-//    viewer_ ->addPolygonMesh(full_mesh_, "full_mesh",0);
 
     viewer_->addPointCloud(interior_boundaries_, "interior_boundaries_");
     viewer_->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_COLOR,
@@ -257,6 +252,7 @@ void HoleDetector::Visualize() {
 }
 
 void HoleDetector::GetFloorplanCloud(bool debug, string floorplan_path) {
+
     if (debug) {
         if (io::loadPCDFile<PointXYZ>(floorplan_path, *floorplan_) == -1) {
             PCL_ERROR ("Couldn't read file\n");
@@ -389,10 +385,6 @@ void HoleDetector::GetFullMesh() {
 
     std::cout << "constructed mesh" << std::endl;
 
-}
-
-void HoleDetector::CalculateVerticalScores() {
-    Utils::ScoreVertical(holes_, floorplan_filtered_);
 }
 
 void HoleDetector::SetBoundarySearchRadius(const float value) {

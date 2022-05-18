@@ -14,8 +14,8 @@ void Utils::ReadTrajectoriesAndGaze(const std::basic_string<char> &traj_file_nam
                                     const std::basic_string<char> &gaze_file_name,
                                     const std::basic_string<char> &lenghts_file_name,
                                     pcl::PCDReader &reader,
-                                    std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& trajectories,
-                                    std::vector<std::vector<Eigen::Vector3f>>& gazes) {
+                                    std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &trajectories,
+                                    std::vector<std::vector<Eigen::Vector3f>> &gazes) {
     pcl::PointCloud<pcl::PointXYZ>::Ptr trajectory = Utils::ReadCloud(traj_file_name, reader);
 
     int max = 0;
@@ -27,12 +27,12 @@ void Utils::ReadTrajectoriesAndGaze(const std::basic_string<char> &traj_file_nam
     std::vector<Eigen::Vector3f> all_gazes;
 
     // decypher .obj file
-    while(std::getline(gaze_file, gaze)) {
-        if(gaze[0] == 'v') {
-            std::stringstream line(gaze.erase(0,2));
+    while (std::getline(gaze_file, gaze)) {
+        if (gaze[0] == 'v') {
+            std::stringstream line(gaze.erase(0, 2));
             std::string segment;
             std::vector<std::string> values;
-            while(std::getline(line, segment, ' ')) {
+            while (std::getline(line, segment, ' ')) {
                 values.push_back(segment);
             }
             Eigen::Vector3f gaze_vec(stof(values[0]), stof(values[1]), stof(values[2]));
@@ -40,11 +40,11 @@ void Utils::ReadTrajectoriesAndGaze(const std::basic_string<char> &traj_file_nam
         }
     }
 
-    while(std::getline(length_file, length)) {
+    while (std::getline(length_file, length)) {
         max += stoi(length);
         pcl::PointCloud<pcl::PointXYZ>::Ptr traj(new pcl::PointCloud<pcl::PointXYZ>);
         std::vector<Eigen::Vector3f> curr_gazes;
-        for(int i = min; i < max; i++) {
+        for (int i = min; i < max; i++) {
             traj->points.push_back(trajectory->points[i]);
             curr_gazes.push_back(all_gazes[i]);
         }
@@ -55,9 +55,9 @@ void Utils::ReadTrajectoriesAndGaze(const std::basic_string<char> &traj_file_nam
 }
 
 void Utils::ExtractAndProjectFloor(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
-                                              pcl::PointCloud<pcl::PointXYZ>::Ptr floor,
-                                              pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected,
-                                              pcl::ModelCoefficients::Ptr coefficients) {
+                                   pcl::PointCloud<pcl::PointXYZ>::Ptr floor,
+                                   pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected,
+                                   pcl::ModelCoefficients::Ptr coefficients) {
     // Create the segmentation object
     pcl::SACSegmentation<pcl::PointXYZ> seg;
     pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
@@ -91,18 +91,18 @@ void Utils::ExtractAndProjectFloor(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
 }
 
 void Utils::CreateConcaveHull(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud,
-                                         pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud,
-                                         std::vector<pcl::Vertices> polygons,
-                                         pcl::ConcaveHull<pcl::PointXYZ> chull) {
+                              pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud,
+                              std::vector<pcl::Vertices> polygons,
+                              pcl::ConcaveHull<pcl::PointXYZ> chull) {
     chull.setInputCloud(input_cloud);
     chull.setAlpha(1);
     chull.reconstruct(*hull_cloud, polygons);
 }
 
 void Utils::GetInteriorBoundaries(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud,
-                                             pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud,
-                                             pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries,
-                                             pcl::PointCloud<pcl::Normal>::Ptr normals) {
+                                  pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud,
+                                  pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries,
+                                  pcl::PointCloud<pcl::Normal>::Ptr normals) {
     // estimate normals and fill in \a normals
     pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
     ne.setInputCloud(input_cloud);
@@ -143,7 +143,8 @@ void Utils::GetInteriorBoundaries(pcl::PointCloud<pcl::PointXYZ>::Ptr input_clou
 }
 
 void Utils::GetHoleClouds(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::Ptr interior_boundaries,
-                          const float n_search_radius, pcl::PointCloud<pcl::Normal>::Ptr boundary_normals, const float angle_thresh) {
+                          const float n_search_radius, pcl::PointCloud<pcl::Normal>::Ptr boundary_normals,
+                          const float angle_thresh) {
     pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
     kdtree.setInputCloud(interior_boundaries);
 
@@ -176,15 +177,18 @@ void Utils::GetHoleClouds(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXY
                     if (p < interior_boundaries->points.size() && p > 0) {
                         // add point to queue
                         pcl::Normal p_normal = boundary_normals->points[p];
-                        float dot_product = search_normal.normal_x * p_normal.normal_x + search_normal.normal_y * p_normal.normal_y;
-                        if (dot_product<0){
+                        float dot_product =
+                                search_normal.normal_x * p_normal.normal_x + search_normal.normal_y * p_normal.normal_y;
+                        if (dot_product < 0) {
                             p_normal.normal_x = p_normal.normal_x * (-1);
                             p_normal.normal_y = p_normal.normal_y * (-1);
                         }
-                        dot_product = search_normal.normal_x * p_normal.normal_x + search_normal.normal_y * p_normal.normal_y;
-                        float mag = sqrt(pow(search_normal.normal_x, 2) + pow(search_normal.normal_y, 2)) * sqrt(pow(p_normal.normal_x, 2) + pow(p_normal.normal_y, 2));
+                        dot_product =
+                                search_normal.normal_x * p_normal.normal_x + search_normal.normal_y * p_normal.normal_y;
+                        float mag = sqrt(pow(search_normal.normal_x, 2) + pow(search_normal.normal_y, 2)) *
+                                    sqrt(pow(p_normal.normal_x, 2) + pow(p_normal.normal_y, 2));
                         float angle = acos(dot_product / mag);
-                        if (angle<angle_thresh) {
+                        if (angle < angle_thresh) {
                             to_visit.push_back(p);
                         }
                     }
@@ -202,41 +206,41 @@ void Utils::GetHoleClouds(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXY
         } while (!to_visit.empty());
         hole.points = hole_cloud;
         hole.size = hole_cloud->points.size();
-        if (hole.size>5) {
+        if (hole.size > 5) {
             holes.push_back(hole);
         }
     }
 }
 
 void Utils::CalcHoleCenters(std::vector<Hole> &holes) {
-    for (auto& hole : holes) {
+    for (auto &hole: holes) {
         Eigen::Matrix<float, 4, 1> hole_center;
         pcl::compute3DCentroid(*hole.points, hole_center);
         hole.centroid = pcl::PointXYZ(hole_center.x(), hole_center.y(), hole_center.z());
     }
 }
 
-void Utils::CreatePointCloudFromImgPts(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
+void Utils::CreatePointCloudFromImgPts(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
                                        std::vector<cv::Point> img_pts,
                                        const float img_resolution) {
-    pcl::PointXYZ last_pt (0, 0, 0);
+    pcl::PointXYZ last_pt(0, 0, 0);
     cloud->push_back(last_pt);
-    for(int i = 1; i < img_pts.size(); i++) {
+    for (int i = 1; i < img_pts.size(); i++) {
         float x_diff = static_cast<float>(img_pts[i].x - img_pts[i - 1].x) * img_resolution;
         float y_diff = static_cast<float>(img_pts[i].y - img_pts[i - 1].y) * img_resolution;
         float x = last_pt.x + x_diff;
         float y = last_pt.y + y_diff;
-        last_pt  = pcl::PointXYZ(x, y, 0);
+        last_pt = pcl::PointXYZ(x, y, 0);
         cloud->push_back(last_pt);
     }
 }
 
-void Utils::DrawLinesInCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
-                                 const pcl::visualization::PCLVisualizer::Ptr viewer) {
+void Utils::DrawLinesInCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+                             const pcl::visualization::PCLVisualizer::Ptr viewer) {
     bool first = true;
-    int cnt =  0;
+    int cnt = 0;
     pcl::PointXYZ last_point = cloud->points[0];
-    for (auto point : *cloud) {
+    for (auto point: *cloud) {
         if (first) {
             first = false;
             continue;
@@ -248,34 +252,34 @@ void Utils::DrawLinesInCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
     viewer->addLine(cloud->points[0], last_point, 1.0, 0.0, 0.0, "line" + std::to_string(cnt));
 }
 
-void Utils::DrawGazesInCloud(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& trajectories,
-                             const std::vector<std::vector<Eigen::Vector3f>>& gazes,
+void Utils::DrawGazesInCloud(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &trajectories,
+                             const std::vector<std::vector<Eigen::Vector3f>> &gazes,
                              const pcl::visualization::PCLVisualizer::Ptr viewer) {
     int n = trajectories.size();
-    for(int i = 0; i < n; i++) {
+    for (int i = 0; i < n; i++) {
         pcl::PointCloud<pcl::PointXYZ>::Ptr curr_traj = trajectories[i];
         std::vector<Eigen::Vector3f> curr_gazes = gazes[i];
         float r1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
         float r3 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
         std::string id_base = "arrow" + std::to_string(i);
-        for(int it = 0; it < curr_gazes.size(); it++) {
-            std::string id = id_base +  std::to_string(it);
+        for (int it = 0; it < curr_gazes.size(); it++) {
+            std::string id = id_base + std::to_string(it);
             std::cout << id << "\n";
             pcl::PointXYZ p1 = curr_traj->points[it];
             pcl::PointXYZ p2(p1.x + curr_gazes[it].x(), p1.y + curr_gazes[it].y(), p1.z + curr_gazes[it].z());
-            viewer->addArrow(p2, p1, r1, 1-r1, r3, false, id);
+            viewer->addArrow(p2, p1, r1, 1 - r1, r3, false, id);
         }
     }
 }
 
-void Utils::TransformPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_in,
-                                const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
+void Utils::TransformPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_in,
+                                const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
                                 std::vector<Eigen::Vector3f> points,
                                 const int max_iteration,
                                 const int max_angle,
                                 const int max_translation) {
     const uint n = cloud_in->width;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_out (new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_out(new pcl::PointCloud<pcl::PointXYZ>);
     Eigen::MatrixXf floor(3, n);
     Eigen::MatrixXf end(3, n);
 
@@ -289,23 +293,23 @@ void Utils::TransformPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud
     pcl::transformPointCloud(*cloud_in, *cloud_out, t, false);
 
     // Project the floor_ and the floorplan to create a true 2d problem z = 0
-    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
-    coefficients->values.resize (4);
+    pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
+    coefficients->values.resize(4);
     coefficients->values[0] = 0;
     coefficients->values[1] = 0;
     coefficients->values[2] = 1;
     pcl::ProjectInliers<pcl::PointXYZ> proj;
-    proj.setModelType (pcl::SACMODEL_PLANE);
-    proj.setInputCloud (cloud_out);
-    proj.setModelCoefficients (coefficients);
-    proj.filter (*cloud_out);
+    proj.setModelType(pcl::SACMODEL_PLANE);
+    proj.setInputCloud(cloud_out);
+    proj.setModelCoefficients(coefficients);
+    proj.filter(*cloud_out);
 
-    proj.setInputCloud (cloud);
-    proj.filter (*cloud);
+    proj.setInputCloud(cloud);
+    proj.filter(*cloud);
 
     srand(static_cast<unsigned int>(std::time(nullptr)));
-    Eigen::Vector3f axis (coefficients->values[0], coefficients->values[1], coefficients->values[2]);
-    pcl::Vertices::Ptr verticesPtr (new pcl::Vertices);
+    Eigen::Vector3f axis(coefficients->values[0], coefficients->values[1], coefficients->values[2]);
+    pcl::Vertices::Ptr verticesPtr(new pcl::Vertices);
     std::vector<uint> vert_vec(n);
     iota(vert_vec.begin(), vert_vec.end(), 0);
     verticesPtr->vertices = vert_vec;
@@ -316,7 +320,7 @@ void Utils::TransformPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud
     crop.setHullIndices(polygon);
     crop.setDim(2);
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cropped_cloud (new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cropped_cloud(new pcl::PointCloud<pcl::PointXYZ>);
     crop.setHullCloud(cloud_out);
     crop.setInputCloud(cloud);
     crop.filter(*cropped_cloud);
@@ -325,24 +329,25 @@ void Utils::TransformPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud
 
     cout << "Number of inliers before ransacing:\t" << max_inlier << endl;
 
-    for(int it = 0; it < max_iteration; it++) {
+    for (int it = 0; it < max_iteration; it++) {
         Eigen::Affine3f rand_t;
-        float angle = (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0 - 1.0) * max_angle / 180.0 * M_PI;
+        float angle =
+                (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0 - 1.0) * max_angle / 180.0 * M_PI;
         float x = (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0 - 1.0) * max_translation;
         float y = (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0 - 1.0) * max_translation;
 
         rand_t = Eigen::AngleAxis<float>(angle, axis);
         rand_t.translation() = Eigen::Vector3f(x, y, 0);
 
-        pcl::PointCloud<pcl::PointXYZ>::Ptr rand_cloud (new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cropped_cloud2 (new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr rand_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cropped_cloud2(new pcl::PointCloud<pcl::PointXYZ>);
         pcl::transformPointCloud(*cloud_out, *rand_cloud, rand_t);
 
         crop.setHullCloud(rand_cloud);
         crop.filter(*cropped_cloud2);
 
         int inliers = cropped_cloud2->width;
-        if(inliers > max_inlier) {
+        if (inliers > max_inlier) {
             max_inlier = inliers;
             cout << it << ":\t" << max_inlier << endl;
             best_transform = rand_t;
@@ -353,15 +358,14 @@ void Utils::TransformPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud
 }
 
 void Utils::CalcAreaScore(std::vector<Hole> &holes, pcl::ConvexHull<pcl::PointXYZ> cvxhull) {
-    pcl::PointCloud<pcl::PointXYZ>::Ptr convex_hull_reconstruct (new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr convex_hull_reconstruct(new pcl::PointCloud<pcl::PointXYZ>);
     std::vector<float> areas;
     float max_area = 0;
-    for (auto& hole : holes) {
+    for (auto &hole: holes) {
         if (hole.points->size() < 3) {
             hole.score = 0;
             areas.push_back(0.0);
-        }
-        else {
+        } else {
             cvxhull.setComputeAreaVolume(true);
             cvxhull.setInputCloud(hole.points);
             cvxhull.reconstruct(*convex_hull_reconstruct);
@@ -372,8 +376,8 @@ void Utils::CalcAreaScore(std::vector<Hole> &holes, pcl::ConvexHull<pcl::PointXY
             }
         }
     }
-    for(int i = 0; i < holes.size(); i++) {
-        if(holes[i].score == 0) {
+    for (int i = 0; i < holes.size(); i++) {
+        if (holes[i].score == 0) {
             continue;
         }
         holes[i].score -= (1 - areas[i] / max_area);
@@ -382,12 +386,12 @@ void Utils::CalcAreaScore(std::vector<Hole> &holes, pcl::ConvexHull<pcl::PointXY
 }
 
 void Utils::DenseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &floorplan,
-                                  pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud,
-                                  pcl::ModelCoefficients::Ptr coefficients) {
+                                pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud,
+                                pcl::ModelCoefficients::Ptr coefficients) {
     bool first = true;
     dense_cloud->clear();
     pcl::PointXYZ last_point = floorplan->points[0];
-    for (auto point : floorplan->points) {
+    for (auto point: floorplan->points) {
         if (first) {
             first = false;
             continue;
@@ -396,7 +400,7 @@ void Utils::DenseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &floorplan,
         float dx = last_point.x - point.x;
         float dy = last_point.y - point.y;
 
-        for (float i = 0.0; i <= 1; i+=0.001) {
+        for (float i = 0.0; i <= 1; i += 0.001) {
             pcl::PointXYZ new_point;
             new_point.x = point.x + i * dx;
             new_point.y = point.y + i * dy;
@@ -407,7 +411,7 @@ void Utils::DenseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &floorplan,
         last_point = point;
     }
     pcl::PointXYZ point = floorplan->points[0];
-    for (float i = 0.0; i <= 1; i+=0.001) {
+    for (float i = 0.0; i <= 1; i += 0.001) {
         float dx = last_point.x - point.x;
         float dy = last_point.y - point.y;
         pcl::PointXYZ new_point;
@@ -425,12 +429,12 @@ void Utils::DenseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &floorplan,
 }
 
 void Utils::ConstructMesh(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
-                          pcl::PolygonMesh & mesh,
+                          pcl::PolygonMesh &mesh,
                           const double normal_search_radius,
-                          const int poisson_depth ) {
+                          const int poisson_depth) {
     /* normal estimation using OMP */
     Eigen::Vector4f centroid;
-    pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>());
+    pcl::PointCloud<pcl::Normal>::Ptr cloud_normals(new pcl::PointCloud<pcl::Normal>());
     pcl::NormalEstimationOMP<pcl::PointXYZ, pcl::Normal> normal_estimate;
     normal_estimate.setNumberOfThreads(8);
     normal_estimate.setInputCloud(cloud);
@@ -441,7 +445,7 @@ void Utils::ConstructMesh(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
 
     // reverse normals' direction
 //    #pragma omp parallel for
-    for(size_t i = 0; i < cloud_normals->size(); ++i){
+    for (size_t i = 0; i < cloud_normals->size(); ++i) {
         cloud_normals->points[i].normal_x *= -1;
         cloud_normals->points[i].normal_y *= -1;
         cloud_normals->points[i].normal_z *= -1;
@@ -464,19 +468,19 @@ void Utils::ConstructMesh(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
 
 bool Utils::GetHoleCovarianceMatrix(const pcl::PointCloud<pcl::PointXYZ>::Ptr crop_cloud,
                                     const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
-                                    Eigen::Matrix3f& cov_matrix) {
+                                    Eigen::Matrix3f &cov_matrix) {
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr hole_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr hole_cloud(new pcl::PointCloud <pcl::PointXYZ>);
 
     const uint n = crop_cloud->width;
-    pcl::Vertices::Ptr verticesPtr (new pcl::Vertices);
-    std::vector<uint> vert_vec(n);
+    pcl::Vertices::Ptr verticesPtr(new pcl::Vertices);
+    std::vector <uint> vert_vec(n);
     iota(vert_vec.begin(), vert_vec.end(), 0);
     verticesPtr->vertices = vert_vec;
-    std::vector<pcl::Vertices> polygon;
+    std::vector <pcl::Vertices> polygon;
     polygon.push_back(*verticesPtr);
 
-    pcl::CropHull<pcl::PointXYZ> crop;
+    pcl::CropHull <pcl::PointXYZ> crop;
     crop.setHullIndices(polygon);
     crop.setDim(2);
 
@@ -486,44 +490,44 @@ bool Utils::GetHoleCovarianceMatrix(const pcl::PointCloud<pcl::PointXYZ>::Ptr cr
 
     Eigen::MatrixXf hole_points(hole_cloud->width, 3);
 
-    for (int i = 0; i <  hole_cloud->width;  i++) {
+    for (int i = 0; i < hole_cloud->width; i++) {
         hole_points.row(i)(0) = hole_cloud->points[i].x;
         hole_points.row(i)(1) = hole_cloud->points[i].y;
         hole_points.row(i)(2) = hole_cloud->points[i].z;
     }
 
-    bool empty = false;
+    bool is_empty = false;
     if (hole_points.rows() == 0) {
-        std::cout << "hole does not enclose any points" << std::endl;
-        empty = true;
-        return empty;
+#ifdef DEBUG
+        std::cout << "Hole does not enclose any points" << std::endl;
+#endif
+        is_empty = true;
+        return is_empty;
     }
 
     Eigen::MatrixXf centered = hole_points.rowwise() - hole_points.colwise().mean();
     cov_matrix = (centered.adjoint() * centered) / float(hole_points.rows() - 1);
 
-    return empty;
+    return is_empty;
 }
 
 
-void Utils::ScoreVertical(std::vector<Hole>& holes,
-                          const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
-    float THRESHOLD = 0.6; // TODO move to config
+void Utils::ScoreVertical(std::vector<Hole> &holes,
+                          const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+                          const float vert_score_threshold) {
 
-    std::cout << "Nr of holes: " << holes.size() << std::endl;
-    for(auto& hole : holes) {
-        Eigen::Matrix3f cov_matrix = Eigen::MatrixXf::Zero(3,3);
+    for (auto &hole: holes) {
+        Eigen::Matrix3f cov_matrix = Eigen::MatrixXf::Zero(3, 3);
 
         bool empty = GetHoleCovarianceMatrix(hole.points, cloud, cov_matrix);
         if (empty) {
             hole.score -= 1;
-            hole.cov_matrix = Eigen::MatrixXf::Zero(3,3);
-            std::cout << hole.score << std::endl;
+            hole.cov_matrix.setZero();
             continue;
         }
 
         // Solve eigenvalue problem  for 3x3 Cov Matrix
-        Eigen::EigenSolver<Eigen::Matrix<float, 3,3> > s(cov_matrix);
+        Eigen::EigenSolver<Eigen::Matrix<float, 3, 3>> s(cov_matrix);
 //        std::cout << cov_matrix << std::endl;
 //        std::cout << "eigenvalues:" << std::endl;
 //        std::cout << s.eigenvalues() << std::endl;
@@ -531,25 +535,29 @@ void Utils::ScoreVertical(std::vector<Hole>& holes,
 //        std::cout << s.eigenvectors() << std::endl;
 
         // Score holes
-        if (cov_matrix(2,2) < THRESHOLD) {
+        if (cov_matrix(2, 2) < vert_score_threshold) {
             hole.score += 0;
         } else {
             hole.score -= 0.5;
         }
 
         hole.cov_matrix = cov_matrix;
-        std::cout << "with score: " << hole.score << " and variances x: " << cov_matrix(0,0) << " y: " << cov_matrix(1,1) << " z: " << cov_matrix(2,2) << std::endl;
+#ifdef DEBUG
+        std::cout << "with score: " << hole.score << " and variances x: " << cov_matrix(0, 0) << " y: "
+                  << cov_matrix(1, 1) << " z: " << cov_matrix(2, 2) << std::endl;
+#endif
     }
 }
 
-void Utils::Calc2DNormals(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::Normal>::Ptr normals, float search_radius) {
-    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
+void Utils::Calc2DNormals(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::Normal>::Ptr normals,
+                          float search_radius) {
+    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
 
     Normal2dEstimation norm_estim;
     norm_estim.setInputCloud(cloud);
-    norm_estim.setSearchMethod (tree);
+    norm_estim.setSearchMethod(tree);
 
-    norm_estim.setRadiusSearch (search_radius);
+    norm_estim.setRadiusSearch(search_radius);
 
     norm_estim.compute(normals);
 }
@@ -649,9 +657,9 @@ void Utils::Grid(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
     pcl::VoxelGrid<pcl::PointXYZ> grid;
 //    grid.setInputCloud(cloud);
     grid.setLeafSize(0.1f, 0.1f, 0.1f);
-    auto coords = grid.getGridCoordinates(0,0,0);
-    coords = grid.getGridCoordinates(1,3,0);
-    coords = grid.getGridCoordinates(1,2,0);
+    auto coords = grid.getGridCoordinates(0, 0, 0);
+    coords = grid.getGridCoordinates(1, 3, 0);
+    coords = grid.getGridCoordinates(1, 2, 0);
 }
 
 void Utils::CreateGrid(pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud,
@@ -662,43 +670,43 @@ void Utils::CreateGrid(pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud,
     pcl::CropBox<pcl::PointXYZ> crop;
     crop.setInputCloud(dense_cloud);
     pcl::getMinMax3D(*dense_cloud, min, max);
-    int min_x = static_cast<int>(min.x-1);
+    int min_x = static_cast<int>(min.x - 1);
     int max_x = static_cast<int>(max.x + 1);
-    int min_y = static_cast<int>(min.y-1);
+    int min_y = static_cast<int>(min.y - 1);
     int max_y = static_cast<int>(max.y + 1);
 
     auto height = static_cast<int>(std::ceil((max_x - min_x) / res));
     auto width = static_cast<int>(std::ceil((max_y - min_y) / res));
 
-    gaze_scores.occupancy_grid = Eigen::MatrixXf::Zero(height,width);
+    gaze_scores.occupancy_grid = Eigen::MatrixXf::Zero(height, width);
 
-    gaze_scores.offset_x = std::abs(min_x/res);
-    gaze_scores.offset_y = std::abs(min_y/res);
+    gaze_scores.offset_x = std::abs(min_x / res);
+    gaze_scores.offset_y = std::abs(min_y / res);
 
-    for (auto point : dense_cloud->points) {
+    for (auto point: dense_cloud->points) {
         auto coords = gaze_scores.grid.getGridCoordinates(point.x, point.y, point.z);
         auto px = gaze_scores.offset_x + coords.x();
         auto py = gaze_scores.offset_y + coords.y();
         gaze_scores.occupancy_grid(px, py) = 1;
-        gaze_scores.occupancy_grid(px, py-1) = 1;
-        gaze_scores.occupancy_grid(px, py+1) = 1;
-        gaze_scores.occupancy_grid(px-1, py) = 1;
-        gaze_scores.occupancy_grid(px+1, py) = 1;
+        gaze_scores.occupancy_grid(px, py - 1) = 1;
+        gaze_scores.occupancy_grid(px, py + 1) = 1;
+        gaze_scores.occupancy_grid(px - 1, py) = 1;
+        gaze_scores.occupancy_grid(px + 1, py) = 1;
     }
 }
 
-bool Utils::CalculateNextGridPoint(const Eigen::Vector3f& gaze,
+bool Utils::CalculateNextGridPoint(const Eigen::Vector3f &gaze,
                                    GazeScores gaze_scores,
                                    pcl::PointXYZ curr_point,
-                                   std::vector<Eigen::Vector3i>& visited,
-                                   pcl::PointXYZ& next_point,
+                                   std::vector<Eigen::Vector3i> &visited,
+                                   pcl::PointXYZ &next_point,
                                    float step_size) {
-    for(int i = 0; i < 10 / step_size; i++) {
+    for (int i = 0; i < 10 / step_size; i++) {
         float x = curr_point.x + i * step_size * gaze.x();
         float y = curr_point.y + i * step_size * gaze.y();
         Eigen::Vector3i next_coord = gaze_scores.grid.getGridCoordinates(x, y, curr_point.z);
         // check if in space
-        if(gaze_scores.occupancy_grid(next_coord.x() + gaze_scores.offset_x, next_coord.y() + gaze_scores.offset_y)) {
+        if (gaze_scores.occupancy_grid(next_coord.x() + gaze_scores.offset_x, next_coord.y() + gaze_scores.offset_y)) {
             return false;
         }
         if (std::count(visited.begin(), visited.end(), next_coord) == 0) {
@@ -710,9 +718,9 @@ bool Utils::CalculateNextGridPoint(const Eigen::Vector3f& gaze,
     return false;
 }
 
-float Utils::CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ gaze_point){
+float Utils::CalculateScoreFromDistance(pcl::PointXYZ grid_point, pcl::PointXYZ gaze_point) {
     float dist = std::sqrt(std::pow(grid_point.x - gaze_point.x, 2) +
-                                std::pow(grid_point.y - gaze_point.y, 2));
+                           std::pow(grid_point.y - gaze_point.y, 2));
     return dist > 10 ? 0 : std::exp(-0.43 * dist);
 }
 
@@ -729,23 +737,24 @@ void Utils::CalcGazeScores(GazeScores &gaze_scores,
 
     uint n = gazes.size();
 
-    for(int i = 0; i < n; i++) {
-        std::cout << i+1 << " / " << n << "\r";
+    for (int i = 0; i < n; i++) {
+        std::cout << i + 1 << " / " << n << "\r";
         std::cout.flush();
-        for(int it = 0; it < gazes[i].size(); it++) {
-            for(int angle_it = -num_of_angles / 2; angle_it < num_of_angles / 2; angle_it++){
+        for (int it = 0; it < gazes[i].size(); it++) {
+            for (int angle_it = -num_of_angles / 2; angle_it < num_of_angles / 2; angle_it++) {
                 Eigen::Vector3f curr_gaze = gazes[i][it];
                 double angle = angle_it * 70.0 / (num_of_angles / 2.0);
-                Eigen::AngleAxis<float> transform(angle, Eigen::Vector3f(0,0,1));
+                Eigen::AngleAxis<float> transform(angle, Eigen::Vector3f(0, 0, 1));
                 curr_gaze = transform * curr_gaze;
 
                 pcl::PointXYZ last_point = trajectories[i]->points[it];
                 pcl::PointXYZ next_point = last_point;
                 std::vector<Eigen::Vector3i> visited;
-                visited.push_back(gaze_scores.grid.getGridCoordinates(last_point.x, last_point.y, last_point.z)); // ignore starting grid cell
+                visited.push_back(gaze_scores.grid.getGridCoordinates(last_point.x, last_point.y,
+                                                                      last_point.z)); // ignore starting grid cell
 
-                while(Utils::CalculateNextGridPoint(curr_gaze, gaze_scores, last_point,
-                                                    visited,next_point)) {
+                while (Utils::CalculateNextGridPoint(curr_gaze, gaze_scores, last_point,
+                                                     visited, next_point)) {
                     float score = Utils::CalculateScoreFromDistance(next_point, trajectories[i]->points[it]);
                     Eigen::Vector3i last_coords = gaze_scores.grid.getGridCoordinates(last_point.x, last_point.y,
                                                                                       last_point.z);
