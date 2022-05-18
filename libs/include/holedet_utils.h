@@ -50,9 +50,6 @@
 
 #include "Normal2dEstimation.h"
 
-
-#include <eigen3/Eigen/Eigenvalues>
-
 #include <eigen3/Eigen/Eigenvalues>
 
 struct Hole {
@@ -224,8 +221,10 @@ public:
     /// Scores all holes based on the information contained in the vertical above the hole
     /// \param holes;      list of all candidate holes
     /// \param cloud;      the complete preprocessed point cloud
+    /// \param vert_score_threshold; Threshold for discrete scoring of vertical information contained in holes
     static void ScoreVertical(std::vector<Hole> &holes,
-                              const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
+                              const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+                              const float vert_score_threshold);
 
     static void CalcHoleGazes(std::vector<Hole> &holes, GazeScores gaze_scores, int patch_size=2);
 };

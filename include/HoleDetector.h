@@ -30,13 +30,19 @@ public:
     bool use_gaze_;
 
     void DetectHoles();
+
     void GetFloorplanCloud(bool debug, string floorplan_path);
+
     void GetFullMesh();
-    void CalculateVerticalScores();
+
     void CalculateScores();
+
     void GazeMap();
+
     void CalculatePoses();
+
     void Visualize();
+
     void SetBoundarySearchRadius(const float value);
 
 private:
@@ -57,11 +63,6 @@ private:
 
     double kOutlierRadius_;
     int kMinNeighbours_;
-
-    double kPassXLimMin_;
-    double kPassXLimMax_;
-    double kPassYLimMin_;
-    double kPassYLimMax_;
 
     double kImgResolution_; // [m/px]
     int kMaxIteration_;
@@ -114,17 +115,23 @@ private:
     double min_score_;
     float boundary_search_radius_;
     float angle_thresh_;
-
+    float vert_score_threshold_;
 
     void ReadYAML();
+
     void InitFilters();
+
     void PreProcess();
+
     void CalculateCentroids();
 
-    void KeyboardEventOccurred (const visualization::KeyboardEvent &event, void* viewer_void);
-    static void PpCallback(const visualization::PointPickingEvent& event, void* viewer_void);
-    static void PointPickerCb(const visualization::PointPickingEvent& event, void* param);
-    static void OnMouse(int event, int x, int y, int flags, void* param);
+    void KeyboardEventOccurred(const visualization::KeyboardEvent &event, void *viewer_void);
+
+    static void PpCallback(const visualization::PointPickingEvent &event, void *viewer_void);
+
+    static void PointPickerCb(const visualization::PointPickingEvent &event, void *param);
+
+    static void OnMouse(int event, int x, int y, int flags, void *param);
 
 };
 
