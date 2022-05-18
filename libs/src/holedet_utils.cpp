@@ -414,8 +414,8 @@ void Utils::Calc2DNormals(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointC
     norm_estim.compute(normals);
 }
 
-void Utils::CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected) {
-    float step_back; //Describes wanted distance between pose and hole boundary
+void Utils::CalcPoses(std::vector<Hole> &holes, const pcl::PointCloud<pcl::PointXYZ>::Ptr& floor_projected) {
+    float step_back = 0.2; //Describes wanted distance between pose and hole boundary
     float filter_size; //sqrt of hole area, size of box filter to determine boundary normal direction
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr points_front(new pcl::PointCloud<pcl::PointXYZ>);
@@ -435,67 +435,74 @@ void Utils::CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::
         //Define filter size for normal direction defintion
         filter_size = sqrt(holes[i].area);
         //std::cout << "Filter size of hole " << i << ": " << filter_size << "\n";
-        step_back = 0.3;
-
         passY.setFilterLimits (-filter_size, filter_size);
         passFront.setFilterLimits (0, 2*filter_size);
         passBack.setFilterLimits (-2*filter_size,0);
 
-        pcl::PointXYZ keypoint = holes[i].points->points[0]; //Temp variable for keypoints
-        for (int j = 0; j < normals->size(); ++j){
-            pcl::PointXYZ boundary_point = holes[i].points->points[j];
+        //Create one pose for every boundary point
+        for (int j = 0; j < holes[i].points->size(); ++j){
+            //For each boundary point generate one pose
+            Eigen::Affine3f pose = Eigen::Affine3f::Identity();
+            pose.translation() = holes[i].points->points[j].getVector3fMap();
+            //Rotate towards normal
+            Eigen::Vector3f dir(normals->points[j].normal_x,
+                                normals->points[j].normal_y,
+                                normals->points[j].normal_z);
+            pose.rotate(Eigen::AngleAxisf(atan2(dir(1), dir(0)), Eigen::Vector3f(0, 0, 1)));
+            pose.rotate(Eigen::AngleAxisf(atan2(dir(2), sqrt(dir(0) * dir(0) + dir(1) * dir(1))),
+                                                  Eigen::Vector3f(0, 1, 0)));
 
-            //Handle keypoint choice
-            bool skip = true;
-            if(j==0 || pcl::euclideanDistance(boundary_point, keypoint) > step_back){
-                skip = false;
-                keypoint = boundary_point;
-            }
+            holes[i].poses.push_back(pose);
+        }
 
-            //Skip if not keypoint
-            if(!skip) {
-                //Get translation
-                Eigen::Affine3f pose = Eigen::Affine3f::Identity();
-                pose.translation() = boundary_point.getVector3fMap();
-
-                //Rotate towards normal
-                Eigen::Vector3f dir(normals->points[j].normal_x, normals->points[j].normal_y,
-                                    normals->points[j].normal_z);
-                pose.rotate(Eigen::AngleAxisf(atan2(dir(1), dir(0)), Eigen::Vector3f(0, 0, 1)));
-                pose.rotate(Eigen::AngleAxisf(atan2(dir(2), sqrt(dir(0) * dir(0) + dir(1) * dir(1))),Eigen::Vector3f(0, 1, 0)));
-
-                ///Handle wrong direction normals
-                pcl::transformPointCloud(*floor_projected, *points_front, pose.inverse(), true); //Transform points to current pose
-                pcl::transformPointCloud(*floor_projected, *points_back, pose.inverse(), true);
-
-                //pass.setFilterLimitsNegative (true);
-                passY.setInputCloud (points_front);
-                passY.filter(*points_front);
-                passY.filter(*points_back);
-
-                //pass.setFilterLimitsNegative (true);
-                passFront.setInputCloud (points_front);
-                passFront.filter(*points_front);
-
-                //pass.setFilterLimitsNegative (true);
-                passBack.setInputCloud (points_back);
-                passBack.filter(*points_back);
-
-                //Switch dirention if nessecary
-                if(points_front->size() > points_back->size()) {
-                    pose.rotate(Eigen::AngleAxisf(M_PI, Eigen::Vector3f(0, 0, 1)));
-                    //std::cout << "Rotated pose!\n";
-                    holes[i].rotateds.push_back(true);
-                }else{
-                    holes[i].rotateds.push_back(false);
+        //Filter out too close poses with double for loop
+        std::vector<Eigen::Affine3f>::iterator iter;
+        for (iter = holes[i].poses.begin(); iter != holes[i].poses.end(); ) {
+            bool skip = false;
+            for (int j = 0; j < holes[i].poses.size(); ++j) {
+                Eigen::Vector3f diff = iter->translation() - holes[i].poses[j].translation();
+                if( (iter-holes[i].poses.begin())!=j && diff.norm() < step_back) {
+                    skip = true;
                 }
-
-                //Take a step back
-                pose.translate(Eigen::Vector3f(-step_back,0,0));
-
-                holes[i].poses.push_back(pose);
+            }
+            if (skip) {
+                iter = holes[i].poses.erase(iter);
+            }else{
+                ++iter;
             }
         }
+
+        //Orient poses and handle wrong normal direction
+        for (int j = 0; j < holes[i].poses.size(); ++j){
+            //Handle wrong direction normals
+            pcl::transformPointCloud(*floor_projected, *points_front, holes[i].poses[j].inverse(), true); //Transform points to current pose
+            pcl::transformPointCloud(*floor_projected, *points_back, holes[i].poses[j].inverse(), true);
+
+            //pass.setFilterLimitsNegative (true);
+            passY.setInputCloud (points_front);
+            passY.filter(*points_front);
+            passY.filter(*points_back);
+
+            //pass.setFilterLimitsNegative (true);
+            passFront.setInputCloud (points_front);
+            passFront.filter(*points_front);
+
+            //pass.setFilterLimitsNegative (true);
+            passBack.setInputCloud (points_back);
+            passBack.filter(*points_back);
+
+            //Switch direction if necessary
+            if(points_front->size() > points_back->size()) {
+                holes[i].poses[j].rotate(Eigen::AngleAxisf(M_PI, Eigen::Vector3f(0, 0, 1)));
+                holes[i].rotateds.push_back(true);
+            }else{
+                holes[i].rotateds.push_back(false);
+            }
+
+            //Take a step back
+            holes[i].poses[j].translate(Eigen::Vector3f(-2*step_back,0,0));
+        }
+        cout << "Number of poses for hole " << i << ": "<<  holes[i].poses.size() << endl;
 
     }
 }

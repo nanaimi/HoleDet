@@ -153,7 +153,7 @@ class Utils {
 
     static void Calc2DNormals(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::Normal>::Ptr normals, float search_radius);
 
-    static void CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected);
+    static void CalcPoses(std::vector<Hole> &holes, const pcl::PointCloud<pcl::PointXYZ>::Ptr& floor_projected);
 };
 #endif //HOLEDET_HOLEDET_UTILS_H
 
