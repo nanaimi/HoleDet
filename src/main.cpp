@@ -13,9 +13,11 @@ int main (int argc, char** argv)
 
     HoleDetector holeDetector (path.string() + "/../", config_path + "config.yaml");
 
-    holeDetector.GetFloorplanCloud(true, data_path + "floorplan.pcd");
+    holeDetector.GetFloorplanCloud(holeDetector.debug_, data_path + "floorplan.pcd");
     holeDetector.DetectHoles();
-    holeDetector.GazeMap();
+    if(holeDetector.use_gaze_) {
+        holeDetector.GazeMap();
+    }
     holeDetector.CalculateScores();
     holeDetector.CalculatePoses();
     holeDetector.GetFullMesh();

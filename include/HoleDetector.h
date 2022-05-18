@@ -26,6 +26,9 @@ class HoleDetector {
 public:
     HoleDetector(const basic_string<char> &path, const basic_string<char> &config_filename);
 
+    bool debug_;
+    bool use_gaze_;
+
     void DetectHoles();
     void GetFloorplanCloud(bool debug, string floorplan_path);
     void GetFullMesh();
@@ -47,8 +50,7 @@ private:
     basic_string<char> floorplan_file_;
     PCDReader reader;
 
-    bool debug_;
-    bool use_gaze_;
+
 
     int kPoissonDepth_;
     float kNormalSearchRadius_;
