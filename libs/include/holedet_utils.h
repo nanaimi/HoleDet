@@ -37,6 +37,8 @@
 #include <pcl/ml/kmeans.h>
 #include <pcl/features/normal_3d_omp.h>
 #include <pcl/surface/poisson.h>
+#include <pcl/filters/passthrough.h>
+
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/types.hpp>
@@ -53,6 +55,8 @@ struct Hole {
     pcl::PointCloud<pcl::PointXYZ>::Ptr points;
     int size;
     std::vector<Eigen::Affine3f> poses;
+    std::vector<bool> rotateds;
+    float area;
     float score;
 };
 
@@ -173,7 +177,7 @@ class Utils {
 
     static void Calc2DNormals(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::Normal>::Ptr normals, float search_radius);
 
-    static void CalcPoses(std::vector<Hole> &holes);
+    static void CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected);
 
     static void Grid(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
 

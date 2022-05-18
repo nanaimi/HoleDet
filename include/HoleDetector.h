@@ -30,6 +30,7 @@ public:
     void GetFloorplanCloud(bool debug, string floorplan_path);
     void CalculateScores();
     void GazeMap();
+    void CalculatePoses();
     void Visualize();
     void SetBoundarySearchRadius(const float value);
 
