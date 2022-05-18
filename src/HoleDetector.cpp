@@ -43,6 +43,7 @@ void HoleDetector::ReadYAML() {
     try {
         YAML::Node config = YAML::LoadFile(config_file_);
         debug_ = config["debug"].as<bool>();
+        use_gaze_ = config["use_gaze"].as<bool>();
         std::cout << "loading" << std::endl;
         pointcloud_file_ = path_ + config["input"]["cloud_file"].as<std::string>();
         trajectory_file_ = path_ + config["input"]["trajectory_file"].as<std::string>();
@@ -50,7 +51,6 @@ void HoleDetector::ReadYAML() {
         lengths_file_ = path_ + config["input"]["lengths_file"].as<std::string>();
         floorplan_file_ = path_ + config["input"]["floorplan_file"].as<std::string>();
 
-        kStartScore_ = config["parameters"]["start_score"].as<float>();
         kPoissonDepth_ = config["parameters"]["poisson_depth"].as<int>();
         kNormalSearchRadius_ = config["parameters"]["normal_search_radius"].as<double>();
 
@@ -163,15 +163,17 @@ void HoleDetector::CalculateCentroids() {
     Utils::GetHoleClouds(holes_, interior_boundaries_, boundary_search_radius_, boundary_normals_, angle_thresh_);
     Utils::CalcHoleCenters(holes_);
     std::cout << holes_.size() << "\n";
-    for (auto &hole: holes_) {
-        hole.score = kStartScore_;
+    for(auto& hole : holes_) {
+        hole.score = use_gaze_ ? 3 : 2;
     }
 }
 
 void HoleDetector::CalculateScores() {
     /* Calculate A score based on the Area */
     Utils::CalcAreaScore(holes_, cvxhull_);
-    Utils::CalcHoleGazes(holes_, gaze_scores_);
+    if(use_gaze_) {
+        Utils::CalcHoleGazes(holes_, gaze_scores_);
+    }
 
     for(int i = 0; i < holes_.size(); i++) {
         float score = holes_[i].score;

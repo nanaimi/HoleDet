@@ -48,8 +48,7 @@ private:
     PCDReader reader;
 
     bool debug_;
-
-    float kStartScore_;
+    bool use_gaze_;
 
     int kPoissonDepth_;
     float kNormalSearchRadius_;
