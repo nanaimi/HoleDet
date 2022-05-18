@@ -423,13 +423,6 @@ void Utils::DenseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &floorplan,
 
 }
 
-void Utils::CombinePointClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr &source_cloud,
-                               pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud) {
-    for (auto point:source_cloud->points) {
-        cloud->points.push_back(point);
-    }
-}
-
 void Utils::ConstructMesh(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
                           pcl::PolygonMesh & mesh,
                           const double normal_search_radius,
@@ -514,7 +507,7 @@ bool Utils::GetHoleCovarianceMatrix(const pcl::PointCloud<pcl::PointXYZ>::Ptr cr
 
 void Utils::ScoreVertical(std::vector<Hole>& holes,
                           const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
-    float THRESHOLD = 0.5; // TODO move to config
+    float THRESHOLD = 0.6; // TODO move to config
 
     std::cout << "Nr of holes: " << holes.size() << std::endl;
     for(auto& hole : holes) {

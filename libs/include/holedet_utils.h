@@ -190,12 +190,6 @@ class Utils {
                                     pcl::PointCloud<pcl::PointXYZ>::Ptr& dense_cloud,
                                     pcl::ModelCoefficients::Ptr coefficients);
 
-    /// Adds all the points from the source_cloud to cloud.
-    /// \param source_cloud;
-    /// \param cloud;
-    static void CombinePointClouds(pcl::PointCloud<pcl::PointXYZ>::Ptr& source_cloud,
-                                   pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud);
-
     /// Creates mesh using poisson reconstruction
     /// \param cloud;
     /// \param mesh;
@@ -220,7 +214,7 @@ class Utils {
     /// \param holes;      list of all candidate holes
     /// \param cloud;      the complete preprocessed point cloud
     static void ScoreVertical(std::vector<Hole>& holes,
-                                     const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
+                              const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
 };
 #endif //HOLEDET_HOLEDET_UTILS_H
 
