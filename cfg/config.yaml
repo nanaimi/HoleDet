@@ -1,11 +1,11 @@
 ---
 debug: false
 input:
-  cloud_file: /data/hololens.pcd
-  gaze_file: /data/gaze_directions.obj
-  trajectory_file: /data/trajectory.pcd
-  lengths_file: /data/trajectory_lengths.txt
-  floorplan_file: /data/floorplan.jpg
+  cloud_file:      data/hololens.pcd
+  gaze_file:       data/gaze_directions.obj
+  trajectory_file: data/trajectory.pcd
+  lengths_file:    data/trajectory_lengths.txt
+  floorplan_file:  data/floorplan.jpg
 parameters:
   poisson_depth:          7
   normal_search_radius:   0.5
