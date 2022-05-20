@@ -229,13 +229,9 @@ void HoleDetector::Visualize() {
             pcl::PointXYZ p(holes_[i].poses[j].translation().x(),
                             holes_[i].poses[j].translation().y(),
                             holes_[i].poses[j].translation().z());
-            if (holes_[i].rotateds[j]) {
-                viewer_->addSphere(p, 0.05, 255, 255, 255,
-                                   center_name + "_pose" + std::to_string(j)); //add colour sphere to pose
-            } else {
-                viewer_->addSphere(p, 0.05, r1, 1 - r1, r3,
-                                   center_name + "_pose" + std::to_string(j)); //add colour sphere to pose
-            }
+
+            viewer_->addSphere(p, 0.05, r1, 1 - r1, r3,
+                               center_name + "_pose" + std::to_string(j)); //add colour sphere to pose
             viewer_->addCoordinateSystem(0.2, holes_[i].poses[j]); //display pose
         }
 

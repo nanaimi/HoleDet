@@ -562,9 +562,9 @@ void Utils::CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::
         Calc2DNormals(holes[i].points, normals, 0.6);
 
         //Define filter size for normal direction defintion
-        filter_size = sqrt(holes[i].area);
+        filter_size = 0.1*sqrt(holes[i].area);
         //std::cout << "Filter size of hole " << i << ": " << filter_size << "\n";
-        step_back = 0.3;
+        step_back = 0.4;
 
         passY.setFilterLimits(-filter_size, filter_size);
         passFront.setFilterLimits(0, 2 * filter_size);
@@ -598,7 +598,7 @@ void Utils::CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::
                 pose.rotate(Eigen::AngleAxisf(atan2(dir(2), sqrt(dir(0) * dir(0) + dir(1) * dir(1))),
                                               Eigen::Vector3f(0, 1, 0)));
 
-                ///Handle wrong direction normals
+                //Handle wrong direction normals
                 pcl::transformPointCloud(*floor_projected, *points_front, pose.inverse(),
                                          true); //Transform points to current pose
                 pcl::transformPointCloud(*floor_projected, *points_back, pose.inverse(), true);
@@ -619,10 +619,6 @@ void Utils::CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::
                 //Switch dirention if nessecary
                 if (points_front->size() > points_back->size()) {
                     pose.rotate(Eigen::AngleAxisf(M_PI, Eigen::Vector3f(0, 0, 1)));
-                    //std::cout << "Rotated pose!\n";
-                    holes[i].rotateds.push_back(true);
-                } else {
-                    holes[i].rotateds.push_back(false);
                 }
 
                 //Take a step back

@@ -57,7 +57,6 @@ struct Hole {
     pcl::PointCloud<pcl::PointXYZ>::Ptr points;
     int size;
     std::vector<Eigen::Affine3f> poses;
-    std::vector<bool> rotateds;
     float area;
     float score;
     Eigen::Matrix3f cov_matrix;
