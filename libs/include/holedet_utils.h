@@ -259,6 +259,10 @@ public:
     /// \param gaze_scores Gaze scores variable
     /// \param patch_size size of the patch considered for the score
     static void CalcGazeScores(std::vector<Hole> &holes, GazeScores gaze_scores, int patch_size = 2);
+
+    /// Generates output files
+    /// \param holes The holes
+    static void SaveResults(std::vector<Hole> &holes, std::basic_string<char> path);
 };
 
 #endif //HOLEDET_HOLEDET_UTILS_H
