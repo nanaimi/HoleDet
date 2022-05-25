@@ -1,9 +1,10 @@
 # HoleDet
 ## Overview
 This is a project to detect holes or under sampled regions in 3D point clouds of indoor spaces. 
+![a flowdiagram of the pipeline](/home/maurice/Pictures/pipeline.png)
 
 ## Dependencies
-In order to run the pipeline you need some external libaries:
+In order to run the pipeline you need some external libraries:
 - [PCL](https://pointclouds.org/downloads/) version: 1.10
 - [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) version: 3.3
 - [OpenCV](https://opencv.org/releases/) version: 4.2
