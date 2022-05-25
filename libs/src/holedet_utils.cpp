@@ -406,8 +406,40 @@ void Utils::DenseFloorplanCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &floorplan,
 
 }
 
+void Utils::CreateFloorplanFiltered(const pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud,
+                                    const pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected,
+                                    const pcl::PointCloud<pcl::PointXYZ>::Ptr dense_floorplan_outline,
+                                    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr full_cloud(new pcl::PointCloud <pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr tmp_cloud(new pcl::PointCloud <pcl::PointXYZ>);
+
+    *full_cloud += *filtered_cloud;
+    *full_cloud += *dense_floorplan_outline;
+    *full_cloud += *floor_projected;
+
+    const uint n = dense_floorplan_outline->width;
+    pcl::Vertices::Ptr verticesPtr(new pcl::Vertices);
+    std::vector <uint> vert_vec(n);
+    iota(vert_vec.begin(), vert_vec.end(), 0);
+    verticesPtr->vertices = vert_vec;
+    std::vector <pcl::Vertices> polygon;
+    polygon.push_back(*verticesPtr);
+
+    pcl::CropHull <pcl::PointXYZ> crop;
+    crop.setHullIndices(polygon);
+    crop.setDim(2);
+
+    crop.setHullCloud(dense_floorplan_outline);
+    crop.setInputCloud(full_cloud);
+    crop.filter(*full_cloud);
+
+    *cloud = *full_cloud;
+}
+
+
 void Utils::ConstructMesh(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
-                          pcl::PolygonMesh &mesh,
+                          pcl::PolygonMesh::Ptr mesh,
                           const double normal_search_radius,
                           const int poisson_depth) {
     /* normal estimation using OMP */
@@ -438,9 +470,8 @@ void Utils::ConstructMesh(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
     pcl::Poisson<pcl::PointNormal> poisson;
     poisson.setDepth(poisson_depth);
     poisson.setInputCloud(cloud_smoothed_normals);
-    poisson.reconstruct(mesh);
+    poisson.reconstruct(*mesh);
     /* end poisson reconstruction */
-
 }
 
 
@@ -505,7 +536,7 @@ void Utils::ScoreVertical(std::vector<Hole> &holes,
         }
 
         // Solve eigenvalue problem  for 3x3 Cov Matrix
-        Eigen::EigenSolver<Eigen::Matrix<float, 3, 3>> s(cov_matrix);
+//        Eigen::EigenSolver<Eigen::Matrix<float, 3, 3>> s(cov_matrix);
 //        std::cout << cov_matrix << std::endl;
 //        std::cout << "eigenvalues:" << std::endl;
 //        std::cout << s.eigenvalues() << std::endl;
@@ -557,7 +588,7 @@ void Utils::CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::
         Calc2DNormals(holes[i].points, normals, 0.6);
 
         //Define filter size for normal direction defintion
-        filter_size = 0.1*sqrt(holes[i].area);
+        filter_size = 0.1 * sqrt(holes[i].area);
         //std::cout << "Filter size of hole " << i << ": " << filter_size << "\n";
         step_back = 0.4;
 
