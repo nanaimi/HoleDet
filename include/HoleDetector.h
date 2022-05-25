@@ -113,7 +113,7 @@ private:
     std::vector<std::vector<Eigen::Vector3f>> gazes_;
 
     // Meshes
-    pcl::PolygonMesh full_mesh_;
+    pcl::PolygonMesh::Ptr full_mesh_;
 
     // Reconstruction variables
     pcl::ModelCoefficients::Ptr floor_coefficients_;

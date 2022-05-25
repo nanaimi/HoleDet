@@ -181,11 +181,21 @@ public:
                                     pcl::PointCloud<pcl::PointXYZ>::Ptr &dense_cloud,
                                     pcl::ModelCoefficients::Ptr coefficients);
 
+    /// Creates the point cloud necessary for mesh reconstruction
+    /// \param filtered_cloud; The preprocessed point cloud
+    /// \param floor_projected; the point cloud projected on the floor
+    /// \param dense_floorplan_outline; boundary points of floor plan
+    /// \param cloud; output cloud
+    static void CreateFloorplanFiltered(const pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud,
+                                        const pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected,
+                                        const pcl::PointCloud<pcl::PointXYZ>::Ptr dense_floorplan_outline,
+                                        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
+
     /// Creates mesh using poisson reconstruction
-    /// \param cloud;
-    /// \param mesh;
+    /// \param cloud; input point cloud from which to reconstruct mesh
+    /// \param mesh; triangle mesh created
     static void ConstructMesh(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
-                              pcl::PolygonMesh &mesh,
+                              pcl::PolygonMesh::Ptr mesh,
                               const double normal_search_radius,
                               const int poisson_depth);
 
