@@ -33,8 +33,10 @@ HoleDetector::HoleDetector(const basic_string<char> &path, const basic_string<ch
 
     InitFilters();
     raw_cloud_ = Utils::ReadCloud(pointcloud_file_, reader_);
-    Utils::ReadTrajectoriesAndGaze(trajectory_file_, gaze_file_,
-                                   lengths_file_, reader_, trajectories_, gazes_);
+    if (kUseGaze_) {
+        Utils::ReadTrajectoriesAndGaze(trajectory_file_, gaze_file_,
+                                       lengths_file_, reader_, trajectories_, gazes_);
+    }
     PreProcess();
     Utils::ExtractAndProjectFloor(filtered_cloud_, floor_, floor_projected_,
                                   floor_coefficients_);
