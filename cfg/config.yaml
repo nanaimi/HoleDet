@@ -1,6 +1,6 @@
 ---
 use_existing_floorplan: true
-use_gaze:               true
+use_gaze:               false
 input:
   cloud_file:      data/hololens.pcd
   gaze_file:       data/gaze_directions.obj
@@ -16,7 +16,6 @@ parameters:
   max_iteration:          10000
   max_translation:        5
   max_angle:              10
-  start_score:            5.0
   boundary_search_radius: 0.6
   angle_thresh:           3.14
   vert_score_threshold:   0.6
