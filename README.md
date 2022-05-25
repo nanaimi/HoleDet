@@ -1,8 +1,8 @@
 # HoleDet
 ## Overview
-This is a project to detect holes or under sampled regions in 3D point clouds of 
-indoor spaces using the following pipeline 
-![a flowdiagram of the pipeline](pipeline.png)
+This is a project to detect holes or under sampled regions in 3D point clouds of indoor spaces using the following
+pipeline:
+![a flowdiagram of the pipeline](doc/pipeline.png)
 
 ## Dependencies
 In order to run the pipeline you need some external libraries:
@@ -32,32 +32,34 @@ libraries used will behave different):
 mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Debug
-make -j 6
+make -j 4
 ./HoleDet
 ```
 
 ### Create Floor plan pcd
-First the floor plan jpg is opened. Here you can click on all corners of your indoor space. It is very important that 
-you remember in which order you click them. If you have clicked them all close the picture with the `esc` button 
+
+First the floor plan jpg is opened. Here you can click on all corners of your indoor space. It is very important that
+you remember in which order you click them. If you have clicked them all, close the picture with the `esc` button
 (do not just close the window). \
-Next the projected point cloud of the floor plane is opened. Here you have to hold `shift` and click on the same 
-corners (in the same order as before). After you have finished do not just close window but just hold `shift` again 
-and click anywhere. Unfortunately the viewer cannot be closed in a different way, which is a known PCL 
-[issue](https://github.com/PointCloudLibrary/pcl/issues/3959). A first transformation based on your selection of corners 
-is then applied. This is then refined using Ransac. This point cloud is then saved, so you do not have to do this step 
-again (remember to change the parameter).
+Next, the projected point cloud of the floor plane is opened. Here you have to hold `shift` and click on the same
+corners (in the same order as before). After you have finished, do not just close window, instead hold `shift` again and
+click anywhere. Unfortunately the viewer cannot be closed in a different way, which is a known PCL
+[issue](https://github.com/PointCloudLibrary/pcl/issues/3959). A first transformation based on your selection of corners
+is then applied. This is then refined using RANSAC. This point cloud is then saved, so you do not have to do this step
+again (remember to change the config parameter).
 
 ### Output
-The pipeline generates multiple outputs files in the `output/` directory. First there is an overview 
-file which shows for each hole:
+
+The pipeline generates multiple output files in the `output/` directory. First there is
+an [overview file](doc/example_results_overview.csv) which shows for each hole:
 - Coordinates of the centroid
 - Number of boundary points
 - Area of hole
 - Score of the hole
 
-Furthermore, for each hole there is a file generated in `output/poses` containing 
-the computed poses to resample the hole. The poses are saved as row major flattened matrices. 
-Before rerunning the pipeline you should delete all the files from the output folder (but not the folder).
+Furthermore, for each hole there is a [csv file](doc/example_poses.csv) generated in `output/poses` containing the
+computed poses to resample the hole. The poses are saved as row major flattened matrices. Before rerunning the pipeline
+you should delete all the files from the output folder (but not the folder).
 
 ## Constants and Parameters
 The pipeline uses a lot of parameters. These can be found and changed in the `cfg/config.yaml` file.
@@ -65,9 +67,10 @@ The pipeline uses a lot of parameters. These can be found and changed in the `cf
 : This should be true if you already have a pcd file of your floor plan. If this is false the pipeline will create it 
 for the next use
 - *use_gaze*
-: True if you want to use the optional gaze and trajectory data. This makes the pipeline a lot slower
-- *input* 
-: The path to all the inputs file. If you use the example data this should not change
+  : True if you want to use the optional gaze and trajectory data. This makes the pipeline a lot slower, but
+  incorporates gaze data into the scoring mechanism
+- *input*
+  : The path to all the input file. If you use the example data this should not change
 - *poisson_depth*
 : The depth of the poisson reconstruction of the mesh
 - *normal_search_radius*
@@ -78,8 +81,8 @@ for the next use
 : The minimum neighbours needed to be an inlier in the outlier removal
 - *image_resolution* 
 : The resolution of the floor plan image in *m/px*. This is only needed if *use_existing_floorplan* is false
-- *max_iteration* 
-: Maximum number of Ransac iterations used to match the floor plan to the original space
+- *max_iteration*
+  : Maximum number of RANSAC iterations used to match the floor plan to the original space
 - *max_translation* 
 : Maximum translation in *m* used to translate the floor plan in the ransac step
 - *max_angle*
