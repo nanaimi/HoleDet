@@ -343,28 +343,23 @@ void Utils::TransformPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud
 void Utils::CalcAreaScore(std::vector<Hole> &holes, pcl::ConvexHull<pcl::PointXYZ> cvxhull) {
     pcl::PointCloud<pcl::PointXYZ>::Ptr convex_hull_reconstruct(new pcl::PointCloud<pcl::PointXYZ>);
     std::vector<float> areas;
-    float max_area = 0;
     for (auto &hole: holes) {
-        if (hole.points->size() < 3) {
-            hole.score = 0;
-            areas.push_back(0.0);
-        } else {
-            cvxhull.setComputeAreaVolume(true);
-            cvxhull.setInputCloud(hole.points);
-            cvxhull.reconstruct(*convex_hull_reconstruct);
-            float area = cvxhull.getTotalArea();
-            areas.push_back(area);
-            if (area > max_area) {
-                max_area = area;
-            }
-        }
+        cvxhull.setComputeAreaVolume(true);
+        cvxhull.setInputCloud(hole.points);
+        cvxhull.reconstruct(*convex_hull_reconstruct);
+        float area = cvxhull.getTotalArea();
+        areas.push_back(area);
     }
+
+    int median_idx = areas.size() / 2;
+    std::nth_element(areas.begin(), areas.begin() + median_idx, areas.end());
+    float median_area = areas.at(median_idx);
+
     for (int i = 0; i < holes.size(); i++) {
-        if (holes[i].score == 0) {
-            continue;
-        }
-        holes[i].score -= (1 - areas[i] / max_area);
-        holes[i].area = areas[i];
+        float sub_value = 1 - areas.at(i) / median_area;
+        sub_value = sub_value < 0.0 ? 0.0 : sub_value;
+        holes.at(i).score -= sub_value;
+        holes.at(i).area = areas.at(i);
     }
 }
 
@@ -758,7 +753,6 @@ void Utils::CalcHeatMaps(GazeScores &gaze_scores,
 
 void Utils::CalcGazeScores(std::vector<Hole> &holes, GazeScores gaze_scores, int patch_size) {
     std::vector<float> summed_scores;
-    float max_sum = 0;
     int max_x = gaze_scores.scores.rows() - 1;
     int max_y = gaze_scores.scores.cols() - 1;
     for (auto &hole: holes) {
@@ -775,12 +769,14 @@ void Utils::CalcGazeScores(std::vector<Hole> &holes, GazeScores gaze_scores, int
             }
         }
         summed_scores.push_back(summed_score);
-        if (summed_score > max_sum) {
-            max_sum = summed_score;
-        }
     }
+    int median_idx = summed_scores.size() / 2;
+    std::nth_element(summed_scores.begin(), summed_scores.begin() + median_idx, summed_scores.end());
+    float median_score = summed_scores.at(median_idx);
     for (int i = 0; i < holes.size(); i++) {
-        holes[i].score -= (summed_scores[i] / max_sum);
+        float sub_value = summed_scores.at(i) / median_score;
+        sub_value = sub_value > 1.0 ? 1.0 : sub_value;
+        holes.at(i).score -= sub_value;
     }
 }
 
