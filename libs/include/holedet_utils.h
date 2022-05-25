@@ -273,7 +273,7 @@ public:
 
     /// Generates output files
     /// \param holes The holes
-    static void SaveResults(std::vector<Hole> &holes, std::basic_string<char> path);
+    static void SaveResults(std::vector<Hole> &holes, std::basic_string<char> path, double min_score);
 };
 
 #endif //HOLEDET_HOLEDET_UTILS_H

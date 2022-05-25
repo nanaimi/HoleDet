@@ -811,7 +811,7 @@ void Utils::CalcGazeScores(std::vector<Hole> &holes, GazeScores gaze_scores, int
     }
 }
 
-void Utils::SaveResults(std::vector<Hole> &holes, std::basic_string<char> path) {
+void Utils::SaveResults(std::vector<Hole> &holes, std::basic_string<char> path, double min_score) {
     auto output_folder = path + "/output/";
     ofstream results_overview;
     ofstream pose_writer;
@@ -824,6 +824,8 @@ void Utils::SaveResults(std::vector<Hole> &holes, std::basic_string<char> path) 
     results_overview << "Id,cx,cy,cz,no_points,area,score" << std::endl;
 
     for (int i = 0; i < holes.size(); ++i) {
+        // only save output for holes that are above score threshold
+        if (holes[i].score < min_score) { break; }
         // write overview csv
         results_overview << std::to_string(i) + ",";
         results_overview << std::to_string(holes[i].centroid.x) + ",";

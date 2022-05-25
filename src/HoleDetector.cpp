@@ -195,7 +195,7 @@ void HoleDetector::CalculateScoresAndPoses() {
 
         cout << "Hole " << str_nmb << ":\tScore :" << to_string(score) << "\n";
     }
-    Utils::SaveResults(holes_, path_);
+    Utils::SaveResults(holes_, path_, kMinScore_);
 }
 
 void HoleDetector::Visualize() {
