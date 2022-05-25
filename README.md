@@ -1,6 +1,7 @@
 # HoleDet
 ## Overview
-This is a project to detect holes or under sampled regions in 3D point clouds of indoor spaces. 
+This is a project to detect holes or under sampled regions in 3D point clouds of 
+indoor spaces using the following pipeline 
 ![a flowdiagram of the pipeline](pipeline.png)
 
 ## Dependencies
