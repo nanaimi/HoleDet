@@ -50,10 +50,10 @@ again (remember to change the parameter).
 ### Output
 The pipeline generates multiple outputs files in the `output/` directory. First there is an overview 
 file which shows for each hole:
-- The coordinates the centroid
-- The number of boundary point
-- The area
-- The score
+- Coordinates of the centroid
+- Number of boundary points
+- Area of hole
+- Score of the hole
 
 Furthermore, for each hole there is a file generated in `output/poses` containing 
 the computed poses to resample the hole. The poses are saved as row major flattened matrices. 
