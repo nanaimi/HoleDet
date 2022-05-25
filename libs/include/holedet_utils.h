@@ -49,6 +49,7 @@
 #include <opencv2/core.hpp>
 
 #include <eigen3/Eigen/Eigenvalues>
+#include <Eigen/Dense>
 
 #include "Normal2dEstimation.h"
 

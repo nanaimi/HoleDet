@@ -834,12 +834,20 @@ void Utils::SaveResults(std::vector<Hole> &holes, std::basic_string<char> path) 
         results_overview << std::to_string(holes[i].score) + "\n";
 
 
-        std::string filename = output_folder + "poses/" + std::to_string(i) + "_poses.txt";
+        std::string filename = output_folder + "poses/" + std::to_string(i) + "_poses.csv";
         pose_writer.open(filename);
         if (pose_writer) {
             for (auto pose: holes[i].poses) {
-                pose_writer << pose.matrix() << std::endl;
-                pose_writer << std::endl;
+                auto transform = pose.matrix();
+                transform.transposeInPlace();
+                Eigen::Map<Eigen::RowVectorXf> v1(transform.data(), transform.size());
+                for (int j = 0; j < v1.size(); ++j) {
+                    pose_writer << v1[j];
+                    if (j == v1.size() - 1) {
+                        pose_writer << std::endl;
+                    } else { pose_writer << ","; }
+                }
+
             }
             pose_writer.close();
         }
