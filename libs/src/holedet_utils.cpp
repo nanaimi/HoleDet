@@ -810,3 +810,49 @@ void Utils::CalcGazeScores(std::vector<Hole> &holes, GazeScores gaze_scores, int
         holes.at(i).score -= sub_value;
     }
 }
+
+void Utils::SaveResults(std::vector<Hole> &holes, std::basic_string<char> path) {
+    auto output_folder = path + "/output/";
+    ofstream results_overview;
+    ofstream pose_writer;
+    results_overview.open(output_folder + "results_overview.csv");
+    if (!results_overview) {
+        std::cerr << "could not open file" << std::endl;
+        return;
+    }
+    // add header
+    results_overview << "Id,cx,cy,cz,no_points,area,score" << std::endl;
+
+    for (int i = 0; i < holes.size(); ++i) {
+        // write overview csv
+        results_overview << std::to_string(i) + ",";
+        results_overview << std::to_string(holes[i].centroid.x) + ",";
+        results_overview << std::to_string(holes[i].centroid.y) + ",";
+        results_overview << std::to_string(holes[i].centroid.z) + ",";
+        results_overview << std::to_string(holes[i].size) + ",";
+        results_overview << std::to_string(holes[i].area) + ",";
+        results_overview << std::to_string(holes[i].score) + "\n";
+
+
+        std::string filename = output_folder + "poses/" + std::to_string(i) + "_poses.csv";
+        pose_writer.open(filename);
+        if (pose_writer) {
+            for (auto pose: holes[i].poses) {
+                auto transform = pose.matrix();
+                transform.transposeInPlace();
+                Eigen::Map<Eigen::RowVectorXf> v1(transform.data(), transform.size());
+                for (int j = 0; j < v1.size(); ++j) {
+                    pose_writer << v1[j];
+                    if (j == v1.size() - 1) {
+                        pose_writer << std::endl;
+                    } else { pose_writer << ","; }
+                }
+
+            }
+            pose_writer.close();
+        }
+
+    }
+
+    results_overview.close();
+}

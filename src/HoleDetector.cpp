@@ -152,7 +152,7 @@ void HoleDetector::CreateAndVisualizeHeatMap() {
 
         cv::Mat resized;
         cv::resize(heatmap, resized, cv::Size(heatmap.cols * 2, heatmap.rows * 2));
-        std::string fname = "../data/" + std::to_string(i) + ".jpg";
+        std::string fname = "../output/gaze_map_" + std::to_string(i) + ".jpg";
         imwrite(fname, resized);
         while (true) {
             cv::imshow("angle_scores", resized);
@@ -193,6 +193,7 @@ void HoleDetector::CalculateScoresAndPoses() {
 
         cout << "Hole " << str_nmb << ":\tScore :" << to_string(score) << "\n";
     }
+    Utils::SaveResults(holes_, path_);
 }
 
 void HoleDetector::Visualize() {
