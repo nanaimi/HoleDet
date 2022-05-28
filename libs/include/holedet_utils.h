@@ -210,7 +210,7 @@ public:
     /// Calculates the poses used to resample the hole
     /// \param holes The holes
     /// \param floor_projected The floor cloud
-    static void CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected);
+    static void CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected, float step_back);
 
     /// Creates an occupancy grid from the floorplan cloud stored in the gaze scores variable
     /// \param dense_cloud The floorplan cloud

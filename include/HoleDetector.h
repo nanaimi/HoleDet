@@ -41,10 +41,7 @@ public:
     /// Create the gaze maps in four different directions
     void GazeMap();
 
-    /// Produces set of poses for resampling each hole
-    void CalculatePoses();
-
-    /// Visualizes everytin
+    /// Visualizes everyting
     void Visualize();
 
 private:
@@ -75,6 +72,7 @@ private:
     int kMaxTranslation_;
     int kMaxAngle_; // [deg]
     double kMinScore_;
+    float kStepBack_;
     float kBoundarySearchRadius_;
     float kAngleThresh_;
     float kVertScoreThresh_;

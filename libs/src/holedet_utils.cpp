@@ -568,8 +568,7 @@ void Utils::Calc2DNormals(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointC
     norm_estim.compute(normals);
 }
 
-void Utils::CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected) {
-    float step_back; //Describes wanted distance between pose and hole boundary
+void Utils::CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::Ptr floor_projected, float step_back) {
     float filter_size; //sqrt of hole area, size of box filter to determine boundary normal direction
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr points_front(new pcl::PointCloud<pcl::PointXYZ>);
@@ -588,9 +587,7 @@ void Utils::CalcPoses(std::vector<Hole> &holes, pcl::PointCloud<pcl::PointXYZ>::
         Calc2DNormals(holes[i].points, normals, 0.6);
 
         //Define filter size for normal direction defintion
-        filter_size = 0.1 * sqrt(holes[i].area);
-        //std::cout << "Filter size of hole " << i << ": " << filter_size << "\n";
-        step_back = 0.4;
+        filter_size = 0.5 * sqrt(holes[i].area);
 
         passY.setFilterLimits(-filter_size, filter_size);
         passFront.setFilterLimits(0, 2 * filter_size);

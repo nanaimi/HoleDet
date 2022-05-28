@@ -71,6 +71,8 @@ void HoleDetector::ReadYAML() {
         kVertScoreThresh_ = config["parameters"]["vert_score_threshold"].as<float>();
 
         kMinScore_ = config["parameters"]["min_score"].as<float>();
+
+        kStepBack_ = config["parameters"]["step_back"].as<float>();
     } catch (const YAML::ParserException &ex) {
         std::cout << ex.what() << std::endl;
     }
@@ -184,7 +186,7 @@ void HoleDetector::CalculateScoresAndPoses() {
     }
 
     std::sort(holes_.begin(), holes_.end(), [](Hole a, Hole b) { return a.score > b.score; });
-    Utils::CalcPoses(holes_, floor_projected_);
+    Utils::CalcPoses(holes_, floor_projected_, kStepBack_);
 
     for (int i = 0; i < holes_.size(); i++) {
         float score = holes_[i].score;
@@ -240,7 +242,7 @@ void HoleDetector::Visualize() {
 
             viewer_->addSphere(p, 0.05, r1, 1 - r1, r3,
                                center_name + "_pose" + std::to_string(j)); //add colour sphere to pose
-            viewer_->addCoordinateSystem(0.2, holes_[i].poses[j]); //display pose
+            viewer_->addCoordinateSystem(0.3, holes_[i].poses[j]); //display pose
         }
 
     }
