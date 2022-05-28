@@ -97,3 +97,5 @@ smaller than this threshold can belong to the same cluster
 will be penalised.
 - *min_score*
 : The minimum score a hole has to have to be written out and visualized
+- *step_back*
+: The desire distance between a generated pose and its corrensponding hole's boundary
