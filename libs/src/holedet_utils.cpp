@@ -351,12 +351,11 @@ void Utils::CalcAreaScore(std::vector<Hole> &holes, pcl::ConvexHull<pcl::PointXY
         areas.push_back(area);
     }
 
-    int median_idx = areas.size() / 2;
-    std::nth_element(areas.begin(), areas.begin() + median_idx, areas.end());
-    float median_area = areas.at(median_idx);
+    float sum = std::accumulate(areas.begin(), areas.end(), 0.0f);
+    float mean_area = sum / areas.size();
 
     for (int i = 0; i < holes.size(); i++) {
-        float sub_value = 1 - areas.at(i) / median_area;
+        float sub_value = 1 - areas.at(i) / mean_area;
         sub_value = sub_value < 0.0 ? 0.0 : sub_value;
         holes.at(i).score -= sub_value;
         holes.at(i).area = areas.at(i);
